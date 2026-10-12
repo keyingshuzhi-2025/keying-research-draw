@@ -15,6 +15,9 @@ dependencies = [
   "python-dotenv>=1.0,<2.0",
   "pydantic>=2.8,<3.0",
   "PyYAML>=6.0,<7.0",
+  "pandas>=1.5,<3.0",
+  "openpyxl>=3.1,<4.0",
+
 ]
 
 [project.optional-dependencies]
@@ -54,6 +57,9 @@ test = [
   "types-PyYAML>=6.0.12",
   "types-requests>=2.32.0",
 ]
+mcp = [
+  "mcp>=1.0,<2.0",
+]
 all = [
   "pandas>=1.5,<3.0",
   "openpyxl>=3.1,<4.0",
@@ -77,6 +83,7 @@ all = [
   "mypy>=1.10,<2.0",
   "types-PyYAML>=6.0.12",
   "types-requests>=2.32.0",
+  "mcp>=1.0,<2.0",
 ]
 
 [dependency-groups]
@@ -93,6 +100,7 @@ default-groups = ["dev"]
 
 [project.scripts]
 research-draw = "src.main:main"
+research-draw-mcp = "src.mcp_server.server:main"
 
 [tool.setuptools.packages.find]
 where = ["."]

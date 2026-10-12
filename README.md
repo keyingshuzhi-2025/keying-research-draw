@@ -7,7 +7,7 @@ Research Draw 是一个面向科研场景的可视化工具站，提供从数据
 - Python CLI（`uv run python -m src.main` / `uv run research-draw`）
 - Web 端（FastAPI + Vue3）
 
-> 当前版本：`v0.1.2`
+> 当前版本：`v0.1.3`
 
 项目环境已统一使用 `uv` 管理，Python 版本固定为 `3.13.15`。依赖声明以 `pyproject.toml` 为准，解析结果锁定在 `uv.lock`。
 
@@ -15,7 +15,7 @@ Research Draw 是一个面向科研场景的可视化工具站，提供从数据
 
 版本管理已统一到单一来源：
 
-- 根目录 `VERSION` 为唯一版本源（当前 `0.1.2`）
+- 根目录 `VERSION` 为唯一版本源（当前 `0.1.3`）
 - CLI / Web 后端通过 `src/version.py` 自动读取
 - 前端 `package.json` / `package-lock.json` 在 `npm` 脚本前自动执行 `sync:version` 注入
 
