@@ -89,9 +89,15 @@ class ResearchDrawMCPRunner:
         self,
         project_root: Optional[Path] = None,
         workspace_root: str | Path | None = None,
+        *,
+        display_workspace_root: str | Path | None = None,
     ):
         self.project_root = Path(project_root or Path(__file__).resolve().parents[2]).resolve()
-        self.workspace = MCPWorkspace(workspace_root, self.project_root)
+        self.workspace = MCPWorkspace(
+            workspace_root,
+            self.project_root,
+            display_root=display_workspace_root,
+        )
         self.output_dir = self.workspace.output_dir
 
     def _prepare_environment(self) -> Dict[str, str]:

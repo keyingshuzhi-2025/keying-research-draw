@@ -46,7 +46,7 @@ The MCP server now exposes the original plot discovery and rendering tools plus 
 ## Added for dev-0.1.4
 
 ### Local workspace boundary
-- Requires `RESEARCH_DRAW_MCP_WORKSPACE` for file and render tools.
+- Workspace file and render tools take the active session's `workspace_path` on every call; the compatibility bridge still reads `RESEARCH_DRAW_MCP_WORKSPACE`.
 - The configured directory must exist and be outside the project directory.
 - Imported files are copied to `<workspace>/inputs/mcp/`.
 - Rendered files are saved to `<workspace>/outputs/mcp/`.
@@ -54,20 +54,20 @@ The MCP server now exposes the original plot discovery and rendering tools plus 
 - Each render gets a unique output name, and the runner returns that exact file instead of selecting the most recently modified image.
 
 ### New MCP tools
-- `import_data_file(source_path)`: Imports CSV, TSV, TXT, XLSX, or XLS from inside the workspace.
-- `upload_data_file(filename, content_base64)`: Accepts a bounded Base64 upload from remote MCP clients.
-- `list_workspace_files(limit, offset)`: Lists imported files in the managed input directory.
-- `inspect_data_file(file_id, preview_rows)`: Returns columns, types, null counts, row count, and a bounded preview.
-- `validate_plot_config(mode, plot, config)`: Checks CLI parameter schema, workspace paths, explicit column names, selected required fields, and basic dependency availability without rendering.
-- `list_render_outputs(limit, offset)`: Lists recent rendered images saved inside the workspace.
+- `import_data_file(source_path, workspace_path)`: Imports CSV, TSV, TXT, XLSX, or XLS from the active session workspace.
+- `upload_data_file(filename, content_base64, workspace_path)`: Accepts a bounded Base64 upload into the active session workspace.
+- `list_workspace_files(workspace_path, limit, offset)`: Lists imported files in the active session's managed input directory.
+- `inspect_data_file(file_id, workspace_path, preview_rows)`: Returns columns, types, null counts, row count, and a bounded preview from the selected session.
+- `validate_plot_config(mode, plot, config, workspace_path)`: Checks CLI parameter schema, paths in the selected session workspace, explicit column names, selected required fields, and basic dependency availability without rendering.
+- `list_render_outputs(workspace_path, limit, offset)`: Lists recent rendered images saved inside the selected session workspace.
 
 ### Remote amd64 Docker service
 - `Dockerfile.mcp` builds an MCP-only Linux `amd64` image on Python 3.13.15; Web frontend and test dependencies are excluded.
 - The image serves Streamable HTTP at `/mcp`; the existing stdio entry point remains the default outside HTTP mode.
 - HTTP requests require a bearer token loaded from a Docker Secret file at container startup. The token is not stored in the image, build arguments, or repository.
 - The HTTP endpoint applies Host/Origin allowlists, a 48 MiB MCP body limit, and stateless transport; Compose binds port 8000 to localhost for a TLS reverse proxy.
-- Compose persists imported data and render outputs in a dedicated Docker volume. Remote clients can upload supported tables up to 32 MiB by default.
-- A local `research-draw-mcp:dev-0.1.4-amd64` image was built before the project version source was advanced to v0.1.4; it has not been pushed to a registry.
+- Compose bind-mounts a deployment-configured common host workspace root at `/host-workspaces`; every file tool takes the active session's `workspace_path` as a top-level argument and resolves its inputs/outputs beneath that session directory. A single HTTP MCP instance can therefore serve different selected folders. The server accepts an omitted leading slash only when restoring it places the path beneath the configured host root; all other relative paths are rejected. The common root should be the narrowest parent covering the intended sessions. Remote clients can upload supported tables up to 32 MiB by default.
+- The local `research-draw-mcp:session-workspaces-dev` image is for v0.1.4 deployment testing and has not been pushed to a registry.
 
 ### Tag-triggered image publishing
 - `.github/workflows/publish-mcp-image.yml` runs for `v*` tag pushes or an administrator-triggered retry, and validates a stable `vMAJOR.MINOR.PATCH` tag against `VERSION`.
@@ -116,7 +116,7 @@ src/mcp_server/
 └── harness_bridge.py  # Compatibility bridge using the same workspace-scoped runner
 
 Dockerfile.mcp          # MCP-only linux/amd64 image
-compose.mcp.yaml        # Secret, persistent workspace volume, and localhost port binding
+compose.mcp.yaml        # Secret, common host workspace-root bind mount, and localhost port binding
 
 MCP_SERVER_README.md           # Setup and tool usage
 MCP_IMPLEMENTATION_SUMMARY.md  # Implementation notes
