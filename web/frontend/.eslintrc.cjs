@@ -5,7 +5,7 @@ module.exports = {
     es2022: true,
     node: true
   },
-  extends: ["eslint:recommended", "plugin:vue/vue3-essential"],
+  extends: ["eslint:recommended", "plugin:vue/essential"],
   parserOptions: {
     ecmaVersion: "latest",
     sourceType: "module"
