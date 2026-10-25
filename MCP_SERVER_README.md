@@ -80,7 +80,7 @@ This will start the MCP server using stdio transport, ready to accept connection
 
 服务通过 Streamable HTTP 提供于 `/mcp`。柯影智航连接例如 `https://mcp.example.com/mcp`，并设置请求头 `Authorization: Bearer <团队签发的令牌>`。团队管理员负责核实接入团队、签发和轮换令牌；团队共用令牌标识团队级访问，不能区分具体成员。
 
-GitHub Actions 在推送与根目录 `VERSION` 相符的稳定版本 tag（例如 `v0.1.4`）时自动构建 `linux/amd64` 镜像并发布到 GHCR。成功后镜像地址为 `ghcr.io/keyingshuzhi/keying-research-draw-mcp`，并带有 `v0.1.4`、`0.1.4` 和 `latest` 标签。workflow 使用 `GITHUB_TOKEN` 发布并关联源仓库；GitHub 说明由工作流创建的 package 会继承该仓库的可见性和权限模型。当前源仓库为公开仓库，因此镜像预期可匿名拉取；package 可见性仍可单独管理，首次发布后可在 GitHub Packages 页面确认。详见 [GitHub Actions package 权限说明](https://docs.github.com/en/packages/managing-github-packages-using-github-actions-workflows/publishing-and-installing-a-package-with-github-actions)和 [GHCR 可见性说明](https://docs.github.com/en/packages/learn-github-packages/configuring-a-packages-access-control-and-visibility)。workflow 不使用仓库中的环境配置或密钥作为 build input。
+GitHub Actions 在推送与根目录 `VERSION` 相符的稳定版本 tag（例如 `v0.1.4`）时自动构建 `linux/amd64` 镜像并发布到 GHCR。成功后镜像地址为 `ghcr.io/keyingshuzhi-2025/keying-research-draw-mcp`，并带有 `v0.1.4`、`0.1.4` 和 `latest` 标签。管理员也可从 Actions 手动运行此 workflow 并填写已有稳定版本 tag，以重试镜像发布。workflow 使用 `GITHUB_TOKEN` 发布并关联源仓库；GitHub 说明由工作流创建的 package 会继承该仓库的可见性和权限模型。当前源仓库为公开仓库，因此镜像预期可匿名拉取；package 可见性仍可单独管理，首次发布后可在 GitHub Packages 页面确认。详见 [GitHub Actions package 权限说明](https://docs.github.com/en/packages/managing-github-packages-using-github-actions-workflows/publishing-and-installing-a-package-with-github-actions)和 [GHCR 可见性说明](https://docs.github.com/en/packages/learn-github-packages/configuring-a-packages-access-control-and-visibility)。workflow 不使用仓库中的环境配置或密钥作为 build input。
 
 建议在仓库 Rulesets 中限制 `v*` release tag 的创建和更新权限，只允许发布管理员操作；workflow 本身会拒绝非稳定版本号以及与 `VERSION` 不一致的 tag。
 
