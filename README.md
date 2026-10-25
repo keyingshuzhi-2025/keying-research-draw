@@ -19,20 +19,6 @@ Research Draw 是一个面向科研场景的可视化工具站，提供从数据
 - CLI / Web 后端通过 `src/version.py` 自动读取
 - 前端 `package.json` / `package-lock.json` 在 `npm` 脚本前自动执行 `sync:version` 注入
 
-## GitHub 展示文案
-
-可用于 GitHub 仓库 `Description`（短描述）：
-
-`Research Draw: 科研绘图工具站（CLI + Web），支持统计/学科/3D/离线地图可视化，提供上传、表格录入、渲染历史与本地文件管理。`
-
-English version for GitHub `Description`:
-
-`Research Draw: A scientific visualization toolkit (CLI + Web) for 2D stats, domain plots, 3D charts, and offline maps, with file upload, table input, render history, and local output management.`
-
-推荐仓库 Topics：
-
-`scientific-visualization` `data-visualization` `matplotlib` `fastapi` `vue3` `gis` `3d-plot` `research-tools` `python`
-
 ## 核心能力
 
 - 统计二维：`box` / `violin` / `scatter` / `volcano` / `forest`
