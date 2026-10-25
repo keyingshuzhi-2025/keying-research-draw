@@ -36,7 +36,7 @@ ml = [
   "upsetplot>=0.8,<1.0",
 ]
 maps = [
-  "geopandas>=0.13,<1.0",
+  "geopandas>=1.1.2,<2.0",
   "shapely>=2.0,<3.0",
   "mapclassify>=2.6,<3.0",
   "pyogrio>=0.7,<1.0",
@@ -51,7 +51,7 @@ web = [
   "python-multipart>=0.0.9,<1.0",
 ]
 test = [
-  "pytest>=8.0,<9.0",
+  "pytest>=9.0.3,<10.0",
   "ruff>=0.6,<1.0",
   "mypy>=1.10,<2.0",
   "types-PyYAML>=6.0.12",
@@ -69,7 +69,7 @@ all = [
   "statsmodels>=0.14,<1.0",
   "umap-learn>=0.5,<1.0",
   "upsetplot>=0.8,<1.0",
-  "geopandas>=0.13,<1.0",
+  "geopandas>=1.1.2,<2.0",
   "shapely>=2.0,<3.0",
   "mapclassify>=2.6,<3.0",
   "pyogrio>=0.7,<1.0",
@@ -78,7 +78,7 @@ all = [
   "fastapi>=0.111,<1.0",
   "uvicorn>=0.30,<1.0",
   "python-multipart>=0.0.9,<1.0",
-  "pytest>=8.0,<9.0",
+  "pytest>=9.0.3,<10.0",
   "ruff>=0.6,<1.0",
   "mypy>=1.10,<2.0",
   "types-PyYAML>=6.0.12",
@@ -88,7 +88,7 @@ all = [
 
 [dependency-groups]
 dev = [
-  "pytest>=8.0,<9.0",
+  "pytest>=9.0.3,<10.0",
   "ruff>=0.6,<1.0",
   "mypy>=1.10,<2.0",
   "types-PyYAML>=6.0.12",
