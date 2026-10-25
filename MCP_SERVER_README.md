@@ -49,34 +49,40 @@ uv sync --extra all
 
    工作目录请填写柯影智航本机安装的项目根目录绝对路径。
 
-环境变量保留原配置，并新增工作区变量。工作区必须是已存在的目录，且不能是项目根目录或其子目录：
+环境变量保留原配置。工作区类 MCP 工具会要求调用方在每次请求中提供当前会话工作区的绝对路径；如需限制本地 stdio 服务可访问的会话范围，可设置共同根目录：
 
 ```text
 PYTHONPATH=.
 MPLBACKEND=Agg
 PLOT_BACKEND=Agg
 HEADLESS=1
-RESEARCH_DRAW_MCP_WORKSPACE=/Volumes/柯影数智/研发部/mcp/mcp-keying-research-draw-workspace
+RESEARCH_DRAW_MCP_HOST_WORKSPACES_ROOT=/Volumes/柯影数智/研发部/实验
 ```
 
-先创建独立工作区目录：
+共同根目录需已存在，且应尽可能窄。柯影智航每次调用文件工具时都要传入当前会话的绝对 `workspace_path`；导入和绘图分别写入该目录下的 `inputs/mcp/` 与 `outputs/mcp/`。不配置共同根目录时，本地 stdio 服务仍要求绝对会话路径，但不会额外限制其父目录。
 
 ```bash
-mkdir -p "/Volumes/柯影数智/研发部/mcp/mcp-keying-research-draw-workspace"
+mkdir -p "/Volumes/柯影数智/研发部/实验"
 ```
 
 ```bash
 cd "/Volumes/柯影数智/研发部/mcp/mcp-keying-research-draw"
-RESEARCH_DRAW_MCP_WORKSPACE="/Volumes/柯影数智/研发部/mcp/mcp-keying-research-draw-workspace" /opt/homebrew/bin/uv run research-draw-mcp
+RESEARCH_DRAW_MCP_HOST_WORKSPACES_ROOT="/Volumes/柯影数智/研发部/实验" /opt/homebrew/bin/uv run research-draw-mcp
 ```
 
-工作区必须预先存在，不能是项目根目录或其子目录。服务不会把缺失的工作区配置回退到项目目录。
+`RESEARCH_DRAW_MCP_WORKSPACE` 仅供兼容桥接入口使用；主 MCP 工具以每次调用传入的 `workspace_path` 为准，不会回退到单一默认会话目录。
 
 This will start the MCP server using stdio transport, ready to accept connections from MCP clients.
 
 ### 远程 Docker 部署（amd64）
 
-仓库提供只包含 MCP 服务的 Linux `amd64` 镜像，不打包 Web 前端。镜像基于 Python 3.13.15，保留绘图源码和只读离线地图/示例数据；容器以非 root 用户运行，工作目录挂载为 Docker 持久卷。用户上传的数据和绘图结果、`.env` 运行配置及令牌文件均不进入镜像：持久化内容放在 Docker volume，运行配置由 Compose 注入，令牌由 Docker Secret 提供。`.dockerignore` 会排除 `.env*`、输出目录和本地密钥文件，Dockerfile 只复制明确列出的源码、依赖清单和静态数据目录。
+仓库提供只包含 MCP 服务的 Linux `amd64` 镜像，不打包 Web 前端。镜像基于 Python 3.13.15，保留绘图源码和只读离线地图/示例数据；容器以非 root 用户运行。容器只 bind mount `RESEARCH_DRAW_MCP_HOST_WORKSPACES_ROOT` 指定的共同宿主机目录到 `/host-workspaces`，不把数据持久化在容器层或 Docker volume 中。每次文件相关工具调用都必须提供 `workspace_path`，指定当前柯影智航会话的绝对工作区路径；服务将它限制在共同根目录之内，并分别读写该会话下的 `inputs/mcp/` 和 `outputs/mcp/`。`.env` 运行配置及令牌文件均不进入镜像，运行配置由 Compose 注入，令牌由 Docker Secret 提供。`.dockerignore` 会排除 `.env*`、输出目录和本地密钥文件，Dockerfile 只复制明确列出的源码、依赖清单和静态数据目录。
+
+一个 HTTP MCP 实例可服务多个会话，因为每次工作区工具调用都携带当前会话的 `workspace_path`。客户端/助手必须在每次调用 `import_data_file`、`upload_data_file`、`inspect_data_file`、`list_workspace_files`、`validate_plot_config`、`render_plot` 或 `list_render_outputs` 时传入当前会话工作区绝对路径；不能复用上一个会话的路径。服务端只接受位于 `RESEARCH_DRAW_MCP_HOST_WORKSPACES_ROOT` 之下、且容器挂载中实际存在的目录。请将共同根目录设为覆盖目标会话的最窄父目录；例如仅覆盖实验会话时，可设置为 `/Volumes/柯影数智/研发部/实验`。这会把该共同根目录以读写方式提供给容器，因此不要选择比实际需要更宽的目录。容器以非 root 用户运行：Linux 通常使用 UID/GID `10001:10001`，macOS 应将 `RESEARCH_DRAW_MCP_UID` 和 `RESEARCH_DRAW_MCP_GID` 设为工作区所属账号 ID；容器仍会以附加组 `10001` 读取 Docker Secret。
+
+`RESEARCH_DRAW_MCP_HOST_WORKSPACES_ROOT` 是部署时可配置的存储边界，不是固定会话目录。柯影智航当前会话选中目录 A 时，每次工具调用传目录 A；切换到目录 B 后传目录 B，输入和输出分别落在 A、B 自己的 `inputs/mcp/`、`outputs/mcp/` 下。本机 Docker 测试可以把 `/Volumes/柯影数智/研发部/实验` 作为共同根目录；部署到阿里云时，应把它改成阿里云服务器上实际的数据盘或共享存储路径（例如 `/srv/koying/workspaces`），并确保所有会话工作区都位于该目录中。MCP 收到的绝对路径必须是 Docker 宿主机可见的路径；不能把柯影智航客户端 Mac 上、阿里云服务器不可见的本地路径直接发给远程服务。若会话工作区位于各用户自己的电脑上，需要柯影智航客户端增加文件上传/下载桥接，由客户端把结果写回当前会话目录。
+
+`workspace_path` 是工具的顶层参数，须使用柯影智航当前选中目录的完整绝对路径；`render_plot` 也不能把它放入 `config`。服务兼容某些客户端误删路径首个 `/` 的情况：仅当补回 `/` 后路径严格位于已挂载的共同根目录内，才会按该会话目录处理；其他相对路径仍会被拒绝。
 
 服务通过 Streamable HTTP 提供于 `/mcp`。柯影智航连接例如 `https://mcp.example.com/mcp`，并设置请求头 `Authorization: Bearer <团队签发的令牌>`。团队管理员负责核实接入团队、签发和轮换令牌；团队共用令牌标识团队级访问，不能区分具体成员。
 
@@ -101,13 +107,16 @@ openssl rand -hex 32 | sudo tee /etc/research-draw/mcp-token >/dev/null
 
 令牌文件的组 ID `10001` 对应容器内的 MCP 用户组，使非 root 容器进程可以读取 Secret。若服务器使用 rootless Docker 或 user-namespace remapping，需按主机映射后的 UID/GID 调整文件属主和权限。
 
-把 `.env.mcp.example` 复制为 `.env`，将 `mcp.example.com` 改成实际域名，并选择要部署的镜像标签。然后在仓库目录拉取并启动：
+把 `.env.mcp.example` 复制为 `.env`，设置实际域名、镜像标签、Docker Secret 文件路径，以及包含所有目标会话工作区的共同宿主机根目录。macOS 还需把 UID/GID 设为工作区所属账号的 `id -u` 与 `id -g` 输出。共同根目录和目标会话工作区必须预先存在，再在仓库目录拉取并启动：
 
 ```bash
 cp .env.mcp.example .env
+# Edit .env: set RESEARCH_DRAW_MCP_HOST_WORKSPACES_ROOT and, on macOS, the owning account's UID/GID.
 docker compose -f compose.mcp.yaml pull
 docker compose -f compose.mcp.yaml up -d --no-build
 ```
+
+Compose 使用禁用自动建目录的 bind mount；共同根目录不存在时启动会失败，避免 Docker 自动创建错误路径。
 
 Compose 会使用 `.env` 中的 `RESEARCH_DRAW_MCP_IMAGE`，并把令牌文件作为运行时 Docker Secret 挂载到 `/run/secrets/research_draw_mcp_token`。镜像、构建参数和代码库均不包含令牌值。HTTP 模式在令牌文件缺失或格式不符合要求时会拒绝启动；令牌在进程启动时读取，轮换后需重新创建容器：
 
@@ -117,7 +126,7 @@ docker compose -f compose.mcp.yaml up -d --force-recreate
 
 容器端口默认只绑定服务器的 `127.0.0.1:8000`，由同机反向代理转发并终止 HTTPS。请配置代理速率限制和请求体限制，并通过 `.env` 中的 `RESEARCH_DRAW_MCP_ALLOWED_HOSTS` 设置实际域名；若客户端发送 `Origin`，还需设置 `RESEARCH_DRAW_MCP_ALLOWED_ORIGINS`。部署时不要将明文 HTTP 端口直接暴露到公网。镜像的 HTTP 请求体上限默认为 48 MiB；远程 `upload_data_file` 默认接受不超过 32 MiB 的表格。调整上传上限时，也要相应调高 `RESEARCH_DRAW_MCP_MAX_REQUEST_BODY_MB` 和反向代理请求体上限；HTTP 请求体配置最高为 256 MiB。更大的文件可由管理员放入容器工作区，再使用 `import_data_file`。
 
-远程上传请调用 `upload_data_file(filename, content_base64)`，其中 `content_base64` 是文件原始字节的标准 Base64 编码。`import_data_file(source_path)` 仍用于 MCP 主机工作区中已有的文件。数据文件持久化在容器卷 `/workspace/inputs/mcp/`，图片保存在 `/workspace/outputs/mcp/`；渲染结果图片随 MCP 工具响应返回，容器内路径只供服务端管理使用。
+远程上传请调用 `upload_data_file(filename, content_base64, workspace_path)`，其中 `content_base64` 是文件原始字节的标准 Base64 编码，`workspace_path` 是当前会话工作区绝对路径。所有文件工具都需带上 `workspace_path`，这样切换会话后工具就会操作新会话对应的宿主机目录。`import_data_file(source_path, workspace_path)` 可从当前工作区内已有的文件导入。工具返回的 `path` 是宿主机文件路径，`workspace_relative_path` 是相对当前会话工作区的路径；文件分别写入该工作区的 `inputs/mcp/` 和 `outputs/mcp/`。渲染结果图片也会随 MCP 工具响应返回。
 
 令牌文件通过 Compose Secret 注入；Docker 官方资料说明了 [Compose Secret 的文件挂载方式](https://docs.docker.com/compose/how-tos/use-secrets/)以及 [构建阶段不应通过 `ARG`/`ENV` 传递密钥](https://docs.docker.com/reference/build-checks/secrets-used-in-arg-or-env/)。
 
@@ -224,8 +233,8 @@ The server supports all 50+ plot types from Research Draw, organized into four g
 ## Notes
 
 - The server forces headless mode (`MPLBACKEND=Agg`, `HEADLESS=1`) for compatibility with server environments
-- Output files are saved to `<RESEARCH_DRAW_MCP_WORKSPACE>/outputs/mcp/`
-- Imported tables are copied to `<RESEARCH_DRAW_MCP_WORKSPACE>/inputs/mcp/`
+- Output files are saved to `<workspace_path>/outputs/mcp/`
+- Imported tables are copied to `<workspace_path>/inputs/mcp/`
 - Workspace paths are resolved before file access; paths outside the workspace are rejected
 - Some plot types require additional dependencies:
   - Maps: `maps`, `raster` extras
