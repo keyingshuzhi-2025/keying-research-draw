@@ -7,7 +7,7 @@ Research Draw 是一个面向科研场景的可视化工具站，提供从数据
 - Python CLI（`uv run python -m src.main` / `uv run research-draw`）
 - Web 端（FastAPI + Vue3）
 
-> 当前版本：`v0.1.3`
+> 当前版本：`v0.1.4`
 
 项目环境已统一使用 `uv` 管理，Python 版本固定为 `3.13.15`。依赖声明以 `pyproject.toml` 为准，解析结果锁定在 `uv.lock`。
 
@@ -15,7 +15,7 @@ Research Draw 是一个面向科研场景的可视化工具站，提供从数据
 
 版本管理已统一到单一来源：
 
-- 根目录 `VERSION` 为唯一版本源（当前 `0.1.3`）
+- 根目录 `VERSION` 为唯一版本源（当前 `0.1.4`）
 - CLI / Web 后端通过 `src/version.py` 自动读取
 - 前端 `package.json` / `package-lock.json` 在 `npm` 脚本前自动执行 `sync:version` 注入
 
@@ -108,6 +108,23 @@ uv run python -m src.main --plot points --basemap china_l1 --file data/points_cn
 ```bash
 research-draw --help
 ```
+
+## MCP Server
+
+MCP 服务提供图型发现、参数校验、数据导入与预览、绘图和结果查询。使用本地 MCP 时，需将 `RESEARCH_DRAW_MCP_WORKSPACE` 配置为项目目录以外、已存在的工作区路径：
+
+```bash
+uv sync --extra mcp
+RESEARCH_DRAW_MCP_WORKSPACE="/path/to/research-draw-workspace" uv run research-draw-mcp
+```
+
+输入文件副本保存在 `<工作区>/inputs/mcp/`，绘图结果保存在 `<工作区>/outputs/mcp/`。MCP 工具包括：
+
+- `get_version`、`list_plot_groups`、`list_plots`、`get_plot_schema`
+- `import_data_file`、`list_workspace_files`、`inspect_data_file`
+- `validate_plot_config`、`render_plot`、`list_render_outputs`
+
+详细配置和调用示例见 [MCP_SERVER_README.md](MCP_SERVER_README.md)。
 
 ## Web 快速开始
 

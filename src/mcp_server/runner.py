@@ -7,12 +7,18 @@ and execution of the Research Draw application.
 from __future__ import annotations
 
 import os
-import sys
-import tempfile
+import re
+import threading
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
+from uuid import uuid4
 
 from src.main import ResearchDrawApp
+from src.mcp_server.workspace import MCPWorkspace, WorkspaceError
+
+
+_RENDER_LOCK = threading.RLock()
+_OUTPUT_FORMATS = {"png", "svg", "pdf"}
 
 
 def _dest_to_arg_flag(dest: str) -> str:
@@ -79,25 +85,58 @@ def _build_argv_from_config(
 class ResearchDrawMCPRunner:
     """Runner that executes Research Draw and captures results."""
 
-    def __init__(self, project_root: Optional[Path] = None):
-        self.project_root = project_root or Path(__file__).resolve().parents[2]
-        self._ensure_output_dir()
-
-    def _ensure_output_dir(self) -> None:
-        """Ensure the MCP output directory exists."""
-        self.output_dir = self.project_root / "outputs" / "mcp"
-        self.output_dir.mkdir(parents=True, exist_ok=True)
+    def __init__(
+        self,
+        project_root: Optional[Path] = None,
+        workspace_root: str | Path | None = None,
+    ):
+        self.project_root = Path(project_root or Path(__file__).resolve().parents[2]).resolve()
+        self.workspace = MCPWorkspace(workspace_root, self.project_root)
+        self.output_dir = self.workspace.output_dir
 
     def _prepare_environment(self) -> Dict[str, str]:
         """Prepare environment variables for headless execution."""
-        env = os.environ.copy()
-        # Force headless/backend settings
-        env["MPLBACKEND"] = "Agg"
-        env["PLOT_BACKEND"] = "Agg"
-        env["HEADLESS"] = "1"
-        # Set output directory override
-        env["PLOT_OUTDIR_OVERRIDE"] = str(self.output_dir)
-        return env
+        return {
+            "MPLBACKEND": "Agg",
+            "PLOT_BACKEND": "Agg",
+            "HEADLESS": "1",
+            "PLOT_OUTDIR_OVERRIDE": str(self.output_dir),
+        }
+
+    def _resolve_config_paths(self, config: Dict[str, Any]) -> Dict[str, Any]:
+        resolved = dict(config)
+        for key in ("file", "raster_file", "custom_json_file"):
+            value = resolved.get(key)
+            if value:
+                resolved[key] = str(self.workspace.resolve_workspace_file(str(value)))
+        if resolved.get("basemap_root"):
+            basemap_raw = Path(str(resolved["basemap_root"])).expanduser()
+            if not basemap_raw.is_absolute():
+                basemap_raw = self.project_root / basemap_raw
+            basemap_root = basemap_raw.resolve()
+            workspace_root = self.workspace.root
+            bundled_map_root = (self.project_root / "data" / "geo").resolve()
+            if not (
+                basemap_root.is_relative_to(workspace_root)
+                or basemap_root.is_relative_to(bundled_map_root)
+            ):
+                raise WorkspaceError("basemap_root 只能指向工作区或项目自带的 data/geo 目录。")
+            if not basemap_root.is_dir():
+                raise WorkspaceError(f"basemap_root 不是有效目录：{basemap_root}")
+            resolved["basemap_root"] = str(basemap_root)
+        if "config" in resolved:
+            raise WorkspaceError("MCP config 已是绘图参数对象，不支持再传入 CLI 配置文件路径。")
+        if resolved.get("outdir"):
+            raise WorkspaceError("MCP 绘图输出目录固定在本地工作区，不能通过 outdir 改写。")
+        return resolved
+
+    @staticmethod
+    def _unique_save_name(requested: Any) -> str:
+        raw = str(requested or "").strip()
+        safe = re.sub(r"[^\w.-]+", "_", raw, flags=re.UNICODE).strip("._")
+        safe = safe[:80]
+        prefix = f"{safe}_" if safe else "mcp_"
+        return f"{prefix}{uuid4().hex[:12]}"
 
     def render_plot(
         self, mode: str, plot: str, config: Dict[str, Any]
@@ -114,71 +153,35 @@ class ResearchDrawMCPRunner:
             If success is False, output_path is None
             If success is True, output_path is the path to the saved image
         """
-        # Ensure output directory exists
-        self._ensure_output_dir()
+        with _RENDER_LOCK:
+            try:
+                safe_config = self._resolve_config_paths(config)
+                fmt = str(safe_config.get("fmt") or "png").lower().lstrip(".")
+                if fmt not in _OUTPUT_FORMATS:
+                    return False, f"不支持的导出格式：{fmt}；支持 png、svg、pdf。", None
 
-        # Prepare environment
-        env = self._prepare_environment()
+                save_name = self._unique_save_name(safe_config.get("save_name"))
+                safe_config["save_name"] = save_name
+                safe_config["fmt"] = fmt
+                safe_config["no_show"] = True
+                argv = _build_argv_from_config(mode, plot, safe_config, self.project_root)
+                env_updates = self._prepare_environment()
+                previous_env = {key: os.environ.get(key) for key in env_updates}
+                try:
+                    os.environ.update(env_updates)
+                    app = ResearchDrawApp(argv=argv)
+                    app.run()
+                finally:
+                    for key, previous_value in previous_env.items():
+                        if previous_value is None:
+                            os.environ.pop(key, None)
+                        else:
+                            os.environ[key] = previous_value
 
-        # Build argv
-        argv = _build_argv_from_config(mode, plot, config, self.project_root)
-
-        # Save original environment and argv
-        old_env = dict(os.environ)
-        old_argv = sys.argv.copy()
-
-        try:
-            # Set environment
-            os.environ.update(env)
-            sys.argv = ["research-draw"] + argv
-
-            # Create and run the application
-            app = ResearchDrawApp(argv=argv)
-            app.run()
-
-            # If we get here, execution succeeded
-            # Determine the output file path
-            # We need to figure out what filename was generated
-            save_name = config.get("save_name")
-            fmt = config.get("fmt", "PNG").lower()
-
-            if save_name:
-                # User provided save name
-                filename = f"{save_name}.{fmt}"
-            else:
-                # Need to determine auto-generated name
-                # This is tricky - we'll look for the most recent file in output dir
-                # as a fallback, but ideally we'd capture it from the app
-                filename = None
-
-            output_path = self.output_dir / filename if filename else None
-
-            if filename and output_path.exists():
+                output_path = self.output_dir / f"{save_name}.{fmt}"
+                if not output_path.is_file():
+                    return False, "绘图已执行，但没有在工作区输出目录中找到本次生成的图片。", None
+                self.workspace._ensure_inside_workspace(output_path)
                 return True, f"Successfully rendered {plot}", output_path
-            else:
-                # Try to find the most recent image file in the output directory
-                image_files = list(self.output_dir.glob("*.png")) + list(
-                    self.output_dir.glob("*.svg")
-                ) + list(self.output_dir.glob("*.pdf"))
-                if image_files:
-                    # Return the most recently modified file
-                    latest_file = max(image_files, key=lambda p: p.stat().st_mtime)
-                    return (
-                        True,
-                        f"Successfully rendered {plot} (auto-named)",
-                        latest_file,
-                    )
-                else:
-                    return (
-                        False,
-                        "Render completed but no output file found",
-                        None,
-                    )
-
-        except Exception as e:
-            return False, f"Error rendering plot: {str(e)}", None
-        finally:
-            # Restore environment
-            os.environ.clear()
-            os.environ.update(old_env)
-            sys.argv = old_argv
+            except Exception as e:
+                return False, f"Error rendering plot: {str(e)}", None

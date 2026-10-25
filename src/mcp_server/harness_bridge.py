@@ -1,5 +1,4 @@
 
-import sys
 import json
 import argparse
 from pathlib import Path
@@ -12,7 +11,7 @@ from src.registry import (
     default_args_for_plot,
 )
 from src.registry.plot_registry import PLOT_ALIASES
-from src.main import ResearchDrawApp
+from src.mcp_server.runner import ResearchDrawMCPRunner
 
 def list_plots(group: str = None):
     payload = plot_registry_payload()
@@ -34,55 +33,14 @@ def get_schema(plot: str):
     }
 
 def render_plot(mode: str, plot: str, config: Dict[str, Any]):
-    # The ResearchDrawApp.run() method processes sys.argv.
-    # We simulate the CLI call by constructing argv.
-    argv = ["--mode", mode, "--plot", plot]
-    
-    for key, value in config.items():
-        if key in ("mode", "plot"):
-            continue
-        
-        flag = f"--{key.replace('_', '-')}"
-        if isinstance(value, bool):
-            if value:
-                argv.append(flag)
-        elif isinstance(value, (list, tuple)):
-            for item in value:
-                argv.extend([flag, str(item)])
-        else:
-            argv.extend([flag, str(value)])
-            
     try:
-        # Note: ResearchDrawApp handles its own output directory via environment variables 
-        # or config. We assume it uses the default outputs/figures or outputs/mcp.
-        app = ResearchDrawApp(argv=argv)
-        app.run()
-        
-        # To find the output file, we look for the most recent image in the output directory
-        output_dirs = [Path("outputs/figures"), Path("outputs/mcp")]
-        latest_file = None
-        max_mtime = 0
-        
-        for d in output_dirs:
-            if d.exists():
-                for f in d.glob("*.*"):
-                    if f.suffix.lower() in (".png", ".jpg", ".jpeg", ".pdf", ".svg"):
-                        mtime = f.stat().st_mtime
-                        if mtime > max_mtime:
-                            max_mtime = mtime
-                            latest_file = f
-                            
-        if latest_file:
-            return {
-                "success": True,
-                "path": str(latest_file.absolute()),
-                "message": f"Successfully rendered {plot}"
-            }
-        else:
-            return {"success": False, "error": "Render completed but output file not found."}
-            
-    except Exception as e:
-        return {"success": False, "error": str(e)}
+        runner = ResearchDrawMCPRunner()
+        success, message, output_path = runner.render_plot(mode, plot, config)
+        if not success or output_path is None:
+            return {"success": False, "error": message}
+        return {"success": True, "path": str(output_path), "message": message}
+    except Exception as exc:
+        return {"success": False, "error": str(exc)}
 
 def main():
     parser = argparse.ArgumentParser(description="Research Draw Harness Bridge")
