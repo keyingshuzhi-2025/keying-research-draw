@@ -10,6 +10,9 @@ services:
     init: true
     restart: unless-stopped
     read_only: true
+    user: "${RESEARCH_DRAW_MCP_UID:-10001}:${RESEARCH_DRAW_MCP_GID:-10001}"
+    group_add:
+      - "10001"
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -20,7 +23,8 @@ services:
       - "127.0.0.1:${RESEARCH_DRAW_MCP_HOST_PORT:-8000}:8000"
     environment:
       RESEARCH_DRAW_MCP_TRANSPORT: streamable-http
-      RESEARCH_DRAW_MCP_WORKSPACE: /workspace
+      RESEARCH_DRAW_MCP_HOST_WORKSPACES_ROOT: ${RESEARCH_DRAW_MCP_HOST_WORKSPACES_ROOT:?Set the common host root containing Koying session workspaces}
+      RESEARCH_DRAW_MCP_HOST_WORKSPACES_MOUNT: /host-workspaces
       RESEARCH_DRAW_MCP_TOKEN_FILE: /run/secrets/research_draw_mcp_token
       RESEARCH_DRAW_MCP_PORT: "8000"
       RESEARCH_DRAW_MCP_ALLOWED_HOSTS: ${RESEARCH_DRAW_MCP_ALLOWED_HOSTS:-localhost:8000,127.0.0.1:8000}
@@ -37,12 +41,13 @@ services:
       PYTHONDONTWRITEBYTECODE: "1"
       PYTHONUNBUFFERED: "1"
     volumes:
-      - research_draw_mcp_workspace:/workspace
+      - type: bind
+        source: "${RESEARCH_DRAW_MCP_HOST_WORKSPACES_ROOT:?Set RESEARCH_DRAW_MCP_HOST_WORKSPACES_ROOT in .env to an existing common host workspace root}"
+        target: /host-workspaces
+        bind:
+          create_host_path: false
     secrets:
       - research_draw_mcp_token
-
-volumes:
-  research_draw_mcp_workspace:
 
 secrets:
   research_draw_mcp_token:

@@ -21,7 +21,11 @@ from src.cli.config_schema import validate_cli_config_payload
 from src.cli.parser import build_parser
 from src.mcp_server.runner import ResearchDrawMCPRunner
 from src.mcp_server.http_auth import BearerTokenAuthMiddleware
-from src.mcp_server.workspace import ALLOWED_DATA_SUFFIXES
+from src.mcp_server.workspace import (
+    ALLOWED_DATA_SUFFIXES,
+    WorkspaceError,
+    resolve_workspace_location,
+)
 from src.registry import (
     canonical_plots_by_group,
     group_metadata,
@@ -100,21 +104,31 @@ def _required_imports_for_plot(
 
 
 # Initialize the FastMCP server
-mcp = FastMCP("research-draw")
+mcp = FastMCP(
+    "research-draw",
+    instructions=(
+        "文件工具每次调用都要把当前会话选中的工作区绝对路径作为顶层参数 "
+        "workspace_path 传入；macOS/Linux 路径开头的 / 不可省略。切换会话后使用新会话的路径。"
+        "render_plot 的 workspace_path 是顶层参数，不能放入 config。"
+    ),
+)
 
-# Initialize the runner (will be set up in main)
-_runner: Optional[ResearchDrawMCPRunner] = None
 _project_root: Optional[Path] = None
 
 
-def _get_runner() -> ResearchDrawMCPRunner:
-    """Get or create the runner instance."""
-    global _runner, _project_root
-    if _runner is None:
-        if _project_root is None:
-            _project_root = Path(__file__).resolve().parents[2]
-        _runner = ResearchDrawMCPRunner(_project_root)
-    return _runner
+def _get_runner(workspace_path: str) -> ResearchDrawMCPRunner:
+    """Get a runner scoped to the active Koying session workspace."""
+    global _project_root
+    if not workspace_path:
+        raise WorkspaceError("每次工作区工具调用都必须提供当前会话的 workspace_path。")
+    location = resolve_workspace_location(workspace_path)
+    if _project_root is None:
+        _project_root = Path(__file__).resolve().parents[2]
+    return ResearchDrawMCPRunner(
+        _project_root,
+        location.runtime_root,
+        display_workspace_root=location.host_root,
+    )
 
 
 @mcp.tool()
@@ -240,43 +254,51 @@ def get_plot_schema(plot: str) -> dict:
 
 
 @mcp.tool()
-def import_data_file(source_path: str) -> dict:
-    """Copy a supported local data file into the configured MCP workspace."""
+def import_data_file(source_path: str, workspace_path: str) -> dict:
+    """Import a supported file from the active Koying session workspace.
+
+    workspace_path must be the absolute root of the current conversation's workspace.
+    Pass it on every workspace tool call so different sessions remain isolated.
+    """
     try:
-        return _get_runner().workspace.import_data_file(source_path)
+        return _get_runner(workspace_path).workspace.import_data_file(source_path)
     except Exception as exc:
         return {"success": False, "message": str(exc)}
 
 
 @mcp.tool()
-def upload_data_file(filename: str, content_base64: str) -> dict:
-    """Upload a supported table from the MCP client using standard Base64 content."""
+def upload_data_file(filename: str, content_base64: str, workspace_path: str) -> dict:
+    """Upload a supported table into the active Koying session workspace.
+
+    workspace_path is a top-level argument: copy the current conversation's exact
+    absolute workspace folder, including the first slash on macOS/Linux.
+    """
     try:
-        return _get_runner().workspace.upload_data_file(filename, content_base64)
+        return _get_runner(workspace_path).workspace.upload_data_file(filename, content_base64)
     except Exception as exc:
         return {"success": False, "message": str(exc)}
 
 
 @mcp.tool()
-def list_workspace_files(limit: int = 50, offset: int = 0) -> dict:
-    """List imported tabular files in the MCP workspace's managed input folder."""
+def list_workspace_files(workspace_path: str, limit: int = 50, offset: int = 0) -> dict:
+    """List imported tabular files in the active Koying session workspace."""
     try:
-        return _get_runner().workspace.list_data_files(limit=limit, offset=offset)
+        return _get_runner(workspace_path).workspace.list_data_files(limit=limit, offset=offset)
     except Exception as exc:
         return {"success": False, "message": str(exc), "items": []}
 
 
 @mcp.tool()
-def inspect_data_file(file_id: str, preview_rows: int = 5) -> dict:
-    """Return columns, types, missing-value counts, and a bounded table preview."""
+def inspect_data_file(file_id: str, workspace_path: str, preview_rows: int = 5) -> dict:
+    """Inspect a file_id within the active Koying session workspace."""
     try:
-        return _get_runner().workspace.inspect_data_file(file_id, preview_rows)
+        return _get_runner(workspace_path).workspace.inspect_data_file(file_id, preview_rows)
     except Exception as exc:
         return {"success": False, "message": str(exc)}
 
 
 @mcp.tool()
-def validate_plot_config(mode: str, plot: str, config: dict) -> dict:
+def validate_plot_config(mode: str, plot: str, config: dict, workspace_path: str) -> dict:
     """Preflight a plot request without rendering it."""
     errors: list[str] = []
     warnings: list[str] = []
@@ -300,7 +322,7 @@ def validate_plot_config(mode: str, plot: str, config: dict) -> dict:
     runner: ResearchDrawMCPRunner | None = None
     if not errors:
         try:
-            runner = _get_runner()
+            runner = _get_runner(workspace_path)
             for path_key in ("file", "raster_file", "custom_json_file"):
                 if normalized_config.get(path_key):
                     normalized_config[path_key] = str(
@@ -393,16 +415,16 @@ def validate_plot_config(mode: str, plot: str, config: dict) -> dict:
 
 
 @mcp.tool()
-def list_render_outputs(limit: int = 50, offset: int = 0) -> dict:
-    """List recent rendered files saved in the configured MCP workspace."""
+def list_render_outputs(workspace_path: str, limit: int = 50, offset: int = 0) -> dict:
+    """List recent rendered files in the active Koying session workspace."""
     try:
-        return _get_runner().workspace.list_render_outputs(limit=limit, offset=offset)
+        return _get_runner(workspace_path).workspace.list_render_outputs(limit=limit, offset=offset)
     except Exception as exc:
         return {"success": False, "message": str(exc), "items": []}
 
 
 @mcp.tool()
-def render_plot(mode: str, plot: str, config: dict) -> dict:
+def render_plot(mode: str, plot: str, config: dict, workspace_path: str) -> dict:
     """Render a plot and return the result.
     
     Args:
@@ -412,6 +434,9 @@ def render_plot(mode: str, plot: str, config: dict) -> dict:
                For example: {"title": "My Plot", "xlabel": "X Axis", "ylabel": "Y Axis"}
                For file mode: include "file" parameter with path to data file
                For custom mode: include data parameters like "group", "x", "y", etc.
+        workspace_path: Top-level argument with the exact absolute root of the active
+                        Koying conversation workspace. Include the leading slash on
+                        macOS/Linux; do not put this argument inside config.
                
     Returns:
         Dictionary containing:
@@ -450,7 +475,7 @@ def render_plot(mode: str, plot: str, config: dict) -> dict:
         }
 
     try:
-        runner = _get_runner()
+        runner = _get_runner(workspace_path)
     except Exception as exc:
         return {
             "success": False,
@@ -497,7 +522,8 @@ def render_plot(mode: str, plot: str, config: dict) -> dict:
                 data=image_data,
                 mimeType=media_type
             ),
-            "path": str(output_path),
+            "path": runner.workspace.public_path(output_path),
+            "workspace_relative_path": runner.workspace.workspace_relative_path(output_path),
             "plot_type": canonical_plot,
             "mode": mode,
         }
@@ -506,7 +532,7 @@ def render_plot(mode: str, plot: str, config: dict) -> dict:
             "success": False,
             "message": f"Successfully rendered but failed to read output: {str(e)}",
             "image": None,
-            "path": str(output_path) if output_path else None,
+            "path": runner.workspace.public_path(output_path) if output_path else None,
         }
 
 
