@@ -7,13 +7,21 @@ allowing LLM clients to generate scientific visualizations.
 from __future__ import annotations
 
 import os
+import json
+import logging
+from importlib.util import find_spec
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 from mcp.server.fastmcp import FastMCP
-from mcp.types import TextContent, ImageContent
+from mcp.server.transport_security import TransportSecuritySettings
+from mcp.types import ImageContent
 
+from src.cli.config_schema import validate_cli_config_payload
+from src.cli.parser import build_parser
 from src.mcp_server.runner import ResearchDrawMCPRunner
+from src.mcp_server.http_auth import BearerTokenAuthMiddleware
+from src.mcp_server.workspace import ALLOWED_DATA_SUFFIXES
 from src.registry import (
     canonical_plots_by_group,
     group_metadata,
@@ -28,6 +36,68 @@ from src.registry.plot_registry import (
     PLOT_DEPENDENCY_HINTS,
     PLOT_ALIASES,
 )
+
+
+_COLUMN_CONFIG_KEYS = {
+    "group_col", "value_col", "x_col", "y_col", "z_col", "z3d_col",
+    "u_col", "v_col", "w_col", "scalar_col", "log2fc_col", "p_col",
+    "label_col", "forest_label_col", "effect_col", "ci_low_col", "ci_high_col",
+    "weight_col", "mean_col", "term_col", "count_col", "ratio_col", "hit_col",
+    "score_col", "prob_col", "true_col", "pred_col", "time_col", "event_col",
+    "class_col", "item_col", "response_col", "a_col", "b_col", "c_col",
+    "factor_col", "loading_col", "date_col", "open_col", "high_col", "low_col",
+    "close_col", "volume_col", "return_col", "price_col", "key_col", "lon_col",
+    "lat_col", "size_col", "hue_col",
+}
+_BUNDLED_MAP_ONLY_PLOTS = {"world", "world_admin1", "china"}
+_MODE_REQUIRED_PATH = {"raster": "raster_file"}
+_CUSTOM_REQUIRED_FIELDS = {
+    "box": ("group",),
+    "violin": ("group",),
+    "scatter": ("x", "y"),
+    "volcano": ("log2fc", "pvals"),
+    "forest": ("forest_labels", "effects", "ci_low", "ci_high"),
+    "scatter3d": ("x", "y", "z"),
+    "surface3d": ("x", "y", "z"),
+    "wireframe3d": ("x", "y", "z"),
+    "contour3d": ("x", "y", "z"),
+    "line3d": ("x", "y", "z"),
+    "isosurface3d": ("x", "y", "z", "scalar"),
+    "slice3d": ("x", "y", "z", "scalar"),
+    "quiver3d": ("x", "y", "z", "u", "v", "w"),
+    "waterfall3d": ("x", "y", "z"),
+    "mesh3d": ("x", "y", "z"),
+}
+_PLOT_IMPORTS = {
+    "data": ("pandas",),
+    "maps": ("geopandas",),
+    "raster": ("rasterio",),
+}
+
+
+def _required_imports_for_plot(
+    plot: str,
+    mode: str,
+    dependency_extra: str | None,
+    config: dict[str, Any],
+) -> tuple[str, ...]:
+    modules = list(_PLOT_IMPORTS.get(dependency_extra or "", ()))
+    if (
+        (mode == "file" and plot not in _BUNDLED_MAP_ONLY_PLOTS and plot != "raster")
+        or plot in canonical_plots_by_group().get("domain_2d", [])
+        or plot == "embedding3d"
+    ):
+        modules.append("pandas")
+    if plot in canonical_plots_by_group().get("maps", []):
+        modules.append("geopandas")
+    if plot == "upset":
+        modules.append("upsetplot")
+    elif plot == "isosurface3d":
+        modules.append("skimage")
+    elif plot in {"embedding", "embedding3d"} and str(config.get("embed_method", "pca")).lower() == "umap":
+        modules.append("umap")
+    return tuple(dict.fromkeys(modules))
+
 
 # Initialize the FastMCP server
 mcp = FastMCP("research-draw")
@@ -170,6 +240,168 @@ def get_plot_schema(plot: str) -> dict:
 
 
 @mcp.tool()
+def import_data_file(source_path: str) -> dict:
+    """Copy a supported local data file into the configured MCP workspace."""
+    try:
+        return _get_runner().workspace.import_data_file(source_path)
+    except Exception as exc:
+        return {"success": False, "message": str(exc)}
+
+
+@mcp.tool()
+def upload_data_file(filename: str, content_base64: str) -> dict:
+    """Upload a supported table from the MCP client using standard Base64 content."""
+    try:
+        return _get_runner().workspace.upload_data_file(filename, content_base64)
+    except Exception as exc:
+        return {"success": False, "message": str(exc)}
+
+
+@mcp.tool()
+def list_workspace_files(limit: int = 50, offset: int = 0) -> dict:
+    """List imported tabular files in the MCP workspace's managed input folder."""
+    try:
+        return _get_runner().workspace.list_data_files(limit=limit, offset=offset)
+    except Exception as exc:
+        return {"success": False, "message": str(exc), "items": []}
+
+
+@mcp.tool()
+def inspect_data_file(file_id: str, preview_rows: int = 5) -> dict:
+    """Return columns, types, missing-value counts, and a bounded table preview."""
+    try:
+        return _get_runner().workspace.inspect_data_file(file_id, preview_rows)
+    except Exception as exc:
+        return {"success": False, "message": str(exc)}
+
+
+@mcp.tool()
+def validate_plot_config(mode: str, plot: str, config: dict) -> dict:
+    """Preflight a plot request without rendering it."""
+    errors: list[str] = []
+    warnings: list[str] = []
+    if mode not in ("demo", "custom", "file"):
+        errors.append("mode 必须是 demo、custom 或 file。")
+
+    canonical_plot = public_plot_name(plot)
+    if not canonical_plot or canonical_plot not in ALL_PUBLIC_PLOTS:
+        errors.append(f"未知图型：{plot}。请先调用 list_plots。")
+    if not isinstance(config, dict):
+        errors.append("config 必须是键值对象。")
+        config = {}
+
+    normalized_config: dict[str, Any] = dict(config)
+    if not errors:
+        try:
+            normalized_config = validate_cli_config_payload(build_parser(), normalized_config)
+        except Exception as exc:
+            errors.append(str(exc))
+
+    runner: ResearchDrawMCPRunner | None = None
+    if not errors:
+        try:
+            runner = _get_runner()
+            for path_key in ("file", "raster_file", "custom_json_file"):
+                if normalized_config.get(path_key):
+                    normalized_config[path_key] = str(
+                        runner.workspace.resolve_workspace_file(str(normalized_config[path_key]))
+                    )
+            if normalized_config.get("basemap_root"):
+                runner._resolve_config_paths({"basemap_root": normalized_config["basemap_root"]})
+        except Exception as exc:
+            errors.append(str(exc))
+
+    if canonical_plot and canonical_plot in ALL_PUBLIC_PLOTS and mode in ("demo", "custom", "file"):
+        if mode == "file":
+            path_key = _MODE_REQUIRED_PATH.get(canonical_plot, "file")
+            if canonical_plot in _BUNDLED_MAP_ONLY_PLOTS:
+                path_key = ""
+            if path_key and not normalized_config.get(path_key):
+                errors.append(f"file 模式需要配置 {path_key}。")
+            elif path_key and normalized_config.get(path_key) and runner:
+                try:
+                    input_path = Path(str(normalized_config[path_key]))
+                    if input_path.suffix.lower() in ALLOWED_DATA_SUFFIXES:
+                        inspection = runner.workspace.inspect_workspace_file(input_path)
+                        available_columns = {column["name"] for column in inspection["columns"]}
+                        for key in _COLUMN_CONFIG_KEYS:
+                            value = normalized_config.get(key)
+                            if isinstance(value, str) and value and value not in available_columns:
+                                errors.append(f"{key} 指定的列“{value}”不在文件中。")
+                        required_fields = required_fields_for_plot(canonical_plot)
+                        missing_fields = [
+                            field
+                            for field in required_fields
+                            if not normalized_config.get(field)
+                            and not (field == "z_col" and normalized_config.get("z3d_col"))
+                        ]
+                        if missing_fields:
+                            warnings.append(
+                                "未显式指定字段："
+                                + ", ".join(missing_fields)
+                                + "；该图型可能会尝试自动识别列。"
+                            )
+                except Exception as exc:
+                    errors.append(str(exc))
+        elif mode == "custom":
+            required = _CUSTOM_REQUIRED_FIELDS.get(canonical_plot, ())
+            missing = [field for field in required if not normalized_config.get(field)]
+            if missing:
+                errors.append("custom 模式缺少参数：" + ", ".join(missing))
+            if canonical_plot in canonical_plots_by_group().get("domain_2d", []) or canonical_plot == "embedding3d":
+                custom_data = normalized_config.get("custom_json")
+                custom_file = normalized_config.get("custom_json_file")
+                if not custom_data and not custom_file:
+                    errors.append("该图型的 custom 模式需要 custom_json 或 custom_json_file。")
+                elif custom_data:
+                    try:
+                        decoded = json.loads(custom_data)
+                        if not isinstance(decoded, (list, dict)):
+                            errors.append("custom_json 必须是对象或数组。")
+                    except (TypeError, json.JSONDecodeError):
+                        errors.append("custom_json 不是有效的 JSON。")
+                elif custom_file:
+                    try:
+                        decoded = json.loads(Path(str(custom_file)).read_text(encoding="utf-8"))
+                        if not isinstance(decoded, (list, dict)):
+                            errors.append("custom_json_file 内容必须是对象或数组。")
+                    except (OSError, json.JSONDecodeError):
+                        errors.append("custom_json_file 不存在或不是有效的 JSON。")
+
+    dependency_extra = PLOT_DEPENDENCY_HINTS.get(canonical_plot) if canonical_plot else None
+    missing_modules = [
+        module
+        for module in _required_imports_for_plot(
+            canonical_plot or "", mode, dependency_extra, normalized_config
+        )
+        if find_spec(module) is None
+    ]
+    if missing_modules:
+        errors.append(
+            f"缺少依赖 {', '.join(missing_modules)}；请安装 `uv sync --extra {dependency_extra}`。"
+        )
+
+    return {
+        "valid": not errors,
+        "plot": canonical_plot,
+        "mode": mode,
+        "errors": errors,
+        "warnings": warnings,
+        "dependency_extra": dependency_extra,
+        "normalized_config": normalized_config,
+    }
+
+
+@mcp.tool()
+def list_render_outputs(limit: int = 50, offset: int = 0) -> dict:
+    """List recent rendered files saved in the configured MCP workspace."""
+    try:
+        return _get_runner().workspace.list_render_outputs(limit=limit, offset=offset)
+    except Exception as exc:
+        return {"success": False, "message": str(exc), "items": []}
+
+
+@mcp.tool()
 def render_plot(mode: str, plot: str, config: dict) -> dict:
     """Render a plot and return the result.
     
@@ -190,8 +422,6 @@ def render_plot(mode: str, plot: str, config: dict) -> dict:
         - plot_type: The plot type that was rendered
         - mode: The mode used for rendering
     """
-    runner = _get_runner()
-    
     # Validate mode
     if mode not in ("demo", "custom", "file"):
         return {
@@ -207,6 +437,24 @@ def render_plot(mode: str, plot: str, config: dict) -> dict:
         return {
             "success": False,
             "message": f"Unknown plot type: {plot}. Use list_plots() to see available plots.",
+            "image": None,
+            "path": None,
+        }
+
+    if not isinstance(config, dict):
+        return {
+            "success": False,
+            "message": "config 必须是键值对象。",
+            "image": None,
+            "path": None,
+        }
+
+    try:
+        runner = _get_runner()
+    except Exception as exc:
+        return {
+            "success": False,
+            "message": str(exc),
             "image": None,
             "path": None,
         }
@@ -264,9 +512,66 @@ def render_plot(mode: str, plot: str, config: dict) -> dict:
 
 # 为了向后兼容和直接运行的支持
 def main():
-    """Main entry point for the MCP server."""
-    # 运行FastMCP服务器（默认使用stdio传输）
-    mcp.run()
+    """Start local stdio mode or authenticated remote Streamable HTTP mode."""
+    transport = os.getenv("RESEARCH_DRAW_MCP_TRANSPORT", "stdio").strip().lower()
+    if transport == "stdio":
+        mcp.run()
+        return
+    if transport != "streamable-http":
+        raise SystemExit("RESEARCH_DRAW_MCP_TRANSPORT must be 'stdio' or 'streamable-http'.")
+
+    token_path = os.getenv("RESEARCH_DRAW_MCP_TOKEN_FILE", "").strip()
+    if not token_path:
+        raise SystemExit("RESEARCH_DRAW_MCP_TOKEN_FILE is required for Streamable HTTP mode.")
+    try:
+        token = Path(token_path).read_bytes().strip()
+    except OSError as exc:
+        raise SystemExit(f"Cannot read MCP bearer token file: {token_path}") from exc
+    if len(token) < 32 or any(byte < 33 or byte > 126 for byte in token):
+        raise SystemExit("MCP bearer token must contain at least 32 visible ASCII characters.")
+
+    def csv_setting(name: str, default: list[str]) -> list[str]:
+        raw = os.getenv(name, "")
+        values = [value.strip() for value in raw.split(",") if value.strip()]
+        return values or default
+
+    allowed_hosts = csv_setting(
+        "RESEARCH_DRAW_MCP_ALLOWED_HOSTS", ["localhost:*", "127.0.0.1:*"]
+    )
+    allowed_origins = csv_setting("RESEARCH_DRAW_MCP_ALLOWED_ORIGINS", [])
+    security = TransportSecuritySettings(
+        allowed_hosts=allowed_hosts,
+        allowed_origins=allowed_origins,
+    )
+
+    try:
+        port = int(os.getenv("RESEARCH_DRAW_MCP_PORT", "8000"))
+    except ValueError as exc:
+        raise SystemExit("RESEARCH_DRAW_MCP_PORT must be an integer.") from exc
+    if not 1 <= port <= 65535:
+        raise SystemExit("RESEARCH_DRAW_MCP_PORT must be between 1 and 65535.")
+    try:
+        max_request_body_mb = max(
+            1, min(256, int(os.getenv("RESEARCH_DRAW_MCP_MAX_REQUEST_BODY_MB", "48")))
+        )
+    except ValueError:
+        max_request_body_mb = 48
+
+    import uvicorn
+
+    app = mcp.streamable_http_app(
+        host="0.0.0.0",
+        stateless_http=True,
+        max_request_body_size=max_request_body_mb * 1024 * 1024,
+        transport_security=security,
+    )
+    protected_app = BearerTokenAuthMiddleware(app, token)
+    uvicorn.run(
+        protected_app,
+        host="0.0.0.0",
+        port=port,
+        log_level=os.getenv("RESEARCH_DRAW_MCP_LOG_LEVEL", "info"),
+    )
 
 
 if __name__ == "__main__":

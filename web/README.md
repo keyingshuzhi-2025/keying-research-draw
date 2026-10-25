@@ -2,7 +2,7 @@
 
 > 柯影数智团队开发
 >
-> 当前版本：`v0.1.3`
+> 当前版本：`v0.1.4`
 
 Web 模块基于 CLI 能力封装，提供面向终端用户的一体化科研绘图流程。
 建议统一使用 `uv run` 启动（`uv run python -m src.main`、`uv run uvicorn web.backend.app:app`），避免运行时路径和依赖环境差异。

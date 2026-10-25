@@ -1,8 +1,8 @@
-# ResearchDrawApp 使用手册（v0.1.3）
+# ResearchDrawApp 使用手册（v0.1.4）
 
 本手册覆盖当前项目的 CLI 与 Web 端能力，内容与仓库最新代码同步。
 
-版本治理（v0.1.3）：
+版本治理（v0.1.4）：
 
 - 单一版本源：项目根目录 `VERSION`
 - CLI / Web 后端：通过 `src/version.py` 自动读取并注入

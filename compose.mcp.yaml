@@ -1,0 +1,49 @@
+services:
+  research-draw-mcp:
+    image: ${RESEARCH_DRAW_MCP_IMAGE:-research-draw-mcp:dev-0.1.4-amd64}
+    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: Dockerfile.mcp
+      platforms:
+        - linux/amd64
+    init: true
+    restart: unless-stopped
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp:rw,nosuid,size=512m
+    ports:
+      - "127.0.0.1:${RESEARCH_DRAW_MCP_HOST_PORT:-8000}:8000"
+    environment:
+      RESEARCH_DRAW_MCP_TRANSPORT: streamable-http
+      RESEARCH_DRAW_MCP_WORKSPACE: /workspace
+      RESEARCH_DRAW_MCP_TOKEN_FILE: /run/secrets/research_draw_mcp_token
+      RESEARCH_DRAW_MCP_PORT: "8000"
+      RESEARCH_DRAW_MCP_ALLOWED_HOSTS: ${RESEARCH_DRAW_MCP_ALLOWED_HOSTS:-localhost:8000,127.0.0.1:8000}
+      RESEARCH_DRAW_MCP_ALLOWED_ORIGINS: ${RESEARCH_DRAW_MCP_ALLOWED_ORIGINS:-}
+      RESEARCH_DRAW_MCP_MAX_IMPORT_MB: ${RESEARCH_DRAW_MCP_MAX_IMPORT_MB:-200}
+      RESEARCH_DRAW_MCP_MAX_UPLOAD_MB: ${RESEARCH_DRAW_MCP_MAX_UPLOAD_MB:-32}
+      RESEARCH_DRAW_MCP_MAX_REQUEST_BODY_MB: ${RESEARCH_DRAW_MCP_MAX_REQUEST_BODY_MB:-48}
+      RESEARCH_DRAW_MCP_LOG_LEVEL: ${RESEARCH_DRAW_MCP_LOG_LEVEL:-info}
+      MPLBACKEND: Agg
+      PLOT_BACKEND: Agg
+      HEADLESS: "1"
+      MPLCONFIGDIR: /tmp/matplotlib
+      HOME: /tmp
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      - research_draw_mcp_workspace:/workspace
+    secrets:
+      - research_draw_mcp_token
+
+volumes:
+  research_draw_mcp_workspace:
+
+secrets:
+  research_draw_mcp_token:
+    file: ${RESEARCH_DRAW_MCP_TOKEN_FILE_HOST:?Set RESEARCH_DRAW_MCP_TOKEN_FILE_HOST in .env}
