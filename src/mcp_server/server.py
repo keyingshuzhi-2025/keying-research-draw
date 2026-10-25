@@ -559,12 +559,14 @@ def main():
 
     import uvicorn
 
-    app = mcp.streamable_http_app(
-        host="0.0.0.0",
-        stateless_http=True,
-        max_request_body_size=max_request_body_mb * 1024 * 1024,
-        transport_security=security,
-    )
+    # FastMCP keeps HTTP transport options on its settings object; the pinned
+    # SDK's streamable_http_app() factory does not accept keyword arguments.
+    mcp.settings.host = "0.0.0.0"
+    mcp.settings.port = port
+    mcp.settings.stateless_http = True
+    mcp.settings.max_request_body_size = max_request_body_mb * 1024 * 1024
+    mcp.settings.transport_security = security
+    app = mcp.streamable_http_app()
     protected_app = BearerTokenAuthMiddleware(app, token)
     uvicorn.run(
         protected_app,
