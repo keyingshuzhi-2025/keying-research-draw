@@ -70,8 +70,8 @@ The MCP server now exposes the original plot discovery and rendering tools plus 
 - A local `research-draw-mcp:dev-0.1.4-amd64` image was built before the project version source was advanced to v0.1.4; it has not been pushed to a registry.
 
 ### Tag-triggered image publishing
-- `.github/workflows/publish-mcp-image.yml` runs only for `v*` tag pushes and validates a stable `vMAJOR.MINOR.PATCH` tag against `VERSION`.
-- It publishes `linux/amd64` to `ghcr.io/keyingshuzhi/keying-research-draw-mcp` under `vX.Y.Z`, `X.Y.Z`, and `latest` tags.
+- `.github/workflows/publish-mcp-image.yml` runs for `v*` tag pushes or an administrator-triggered retry, and validates a stable `vMAJOR.MINOR.PATCH` tag against `VERSION`.
+- It publishes `linux/amd64` to `ghcr.io/keyingshuzhi-2025/keying-research-draw-mcp` under `vX.Y.Z`, `X.Y.Z`, and `latest` tags.
 - `.env*`, output folders, and local secret files are excluded from the build context; deployment settings and credentials are supplied only at runtime.
 
 ## Key Features
