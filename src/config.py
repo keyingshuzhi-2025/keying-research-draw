@@ -77,7 +77,7 @@ class PlotConfig:
     backend: str = "TkAgg"
     mac_font: str = "STHeiti"
     win_font: str = "SimHei"
-    linux_font: str = "Arial"  # 服务器可换 'WenQuanYi Zen Hei'
+    linux_font: str = "Noto Sans CJK SC"
     fix_minus: bool = True
 
     # 主题与输出
@@ -97,7 +97,7 @@ class PlotConfig:
             backend=os.getenv("PLOT_BACKEND", "TkAgg"),
             mac_font=os.getenv("MAC_FONT", "STHeiti"),
             win_font=os.getenv("WIN_FONT", "SimHei"),
-            linux_font=os.getenv("LINUX_FONT", "Arial"),
+            linux_font=os.getenv("LINUX_FONT", "Noto Sans CJK SC"),
             fix_minus=_get_bool("FIX_UNICODE_MINUS", True),
             theme=os.getenv("PLOT_THEME", "DEFAULT").upper(),
             dpi=int(os.getenv("PLOT_DPI", "300")),

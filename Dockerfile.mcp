@@ -2,7 +2,10 @@ FROM python:3.13.15-slim-bookworm
 
 WORKDIR /app
 
-RUN python -m pip install --no-cache-dir --disable-pip-version-check "uv==0.13.0" \
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends fonts-noto-cjk \
+    && rm -rf /var/lib/apt/lists/* \
+    && python -m pip install --no-cache-dir --disable-pip-version-check "uv==0.13.0" \
     && groupadd --system --gid 10001 research-draw \
     && useradd --system --uid 10001 --gid 10001 --create-home --home-dir /home/research-draw --shell /usr/sbin/nologin research-draw \
     && mkdir -p /workspace /tmp/matplotlib \
