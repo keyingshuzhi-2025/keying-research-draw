@@ -1,20 +1,22 @@
 # Research Draw 项目留档
 
 > **项目名称**：Research Draw（科研绘图工具站）
-> **版本**：v0.1.4
-> **留档日期**：2026-10-25
-> **留档性质**：项目全量架构与实现概览（静态快照）
+> **版本**：v0.1.5（开发中，尚未发布）
+> **留档日期**：2026-11-12
+> **留档性质**：v0.1.5 项目架构与实现概览
+>
+> 本文件记录归档时的项目状态；当前许可证以项目根目录 [LICENSE](LICENSE) 中的 MIT 许可证为准。
 
 ---
 
 ## 一、项目概述
 
-Research Draw 是一个面向科研场景的可视化工具站，提供从数据输入、字段映射、图型渲染到结果管理的完整流程。覆盖统计二维图、学科领域图、科研常用三维图、离线地图四大类共 50+ 种图表。
+Research Draw 是一个面向科研场景的可视化工具站，提供从数据输入、字段映射、图型渲染到结果管理的完整流程。覆盖统计二维图、学科领域图、科研常用三维图、离线地图四大类共 57 种图表。
 
-项目采用 **双端架构**：
+项目提供 **CLI、Web 和 MCP 三种使用入口**：
 - **Python CLI**：命令行工具，支持 demo / custom / file 三种模式
 - **Web 端**：FastAPI 后端 + Vue3 前端，支持文件上传、异步渲染、历史管理
-- **MCP 服务**：支持本地 stdio 和带 Bearer Token 的 Streamable HTTP；远程服务提供 amd64 Docker 镜像
+- **MCP 服务**：支持本地 stdio 和带 Bearer Token 的 Streamable HTTP；提供图型推荐、单图与批量绘制、异步长任务和超时恢复、结果重绘、分块上传和会话级工作区隔离；远程服务提供 amd64 Docker 镜像
 
 ---
 
@@ -68,6 +70,7 @@ research-draw/
 │   ├── chart/
 │   │   ├── plot_2d/              # 2D 图实现
 │   │   │   ├── static_analysis.py  # 统计图（box/violin/scatter/volcano/forest）
+│   │   │   ├── plotters/static/basic.py # bar/column/line/histogram/area
 │   │   │   ├── geo_atlas.py        # 地图底图（GeoAtlas）
 │   │   │   └── plotters/
 │   │   │       ├── geo/          # choropleth / overlays / views
@@ -96,6 +99,7 @@ research-draw/
 │   └── test_web_maintenance.py
 ├── scripts/                      # 运维与数据准备脚本
 │   ├── README.md
+│   ├── dev_web.py                # 一条命令启动 Web 前后端
 │   ├── download_basemaps.py      # 下载离线底图（Natural Earth + GADM）
 │   ├── generate_test_data.py     # 生成中英文统计图测试数据
 │   ├── generate_domain_demo_data.py  # 生成领域 demo 数据
@@ -108,7 +112,7 @@ research-draw/
 │   │   └── app.py                # FastAPI 主应用（1093 行）
 │   ├── frontend/                 # Vue3 + Vite 前端
 │   │   ├── src/
-│   │   │   ├── App.vue           # 根组件（顶部菜单 + 左侧导航）
+│   │   │   ├── App.vue           # 根组件（左侧导航、工作区和设置/资产弹窗）
 │   │   │   ├── main.js           # 入口
 │   │   │   ├── style.css         # 全局样式
 │   │   │   ├── components/
@@ -116,6 +120,8 @@ research-draw/
 │   │   │   │   ├── PlotSelector.vue
 │   │   │   │   ├── DataInput.vue
 │   │   │   │   ├── RenderPanel.vue
+│   │   │   │   ├── HomePage.vue
+│   │   │   │   ├── AssetManagementPage.vue
 │   │   │   │   ├── ManualPage.vue
 │   │   │   │   └── AboutPage.vue
 │   │   │   └── composables/
@@ -126,11 +132,11 @@ research-draw/
 │   │   ├── vitest.config.js
 │   │   ├── index.html
 │   │   └── scripts/sync-version.mjs
-│   └── assets/                   # 关于页联系方式素材（二维码图片）
+│   └── assets/                   # 品牌素材与联系方式图片
+│       ├── Keying-Atlas-Brand-Kit-v1/
 │       └── images/
 │           ├── 小红书.png
 │           ├── 微信公众号.png
-│           ├── 微信服务号.png
 │           └── 粉丝群.png
 ├── data/                         # demo 数据与离线底图
 │   ├── *.csv / *.tif             # 通用 demo 数据
@@ -156,10 +162,10 @@ research-draw/
 ├── .env                          # 运行时环境变量
 ├── .gitignore                    # Git 忽略规则
 ├── .python-version               # Python 版本锁定（3.13.15）
-├── VERSION                       # 唯一版本源（0.1.4）
+├── VERSION                       # 唯一版本源（0.1.5）
 ├── Dockerfile.mcp                # MCP-only amd64 镜像
 ├── compose.mcp.yaml              # MCP 部署示例（密钥与持久化卷运行时注入）
-├── LICENSE                       # Apache License 2.0
+├── LICENSE                       # MIT License
 ├── .github/workflows/            # CI 与 tag 触发的 MCP 镜像发布
 │   ├── ci.yml
 │   └── publish-mcp-image.yml
@@ -194,14 +200,14 @@ src/save/export.py → finalize_plot_output() → save figure + plt.show/close
 
 | 分组键 | 中文名 | 顺序 | 包含图型数 |
 |--------|--------|------|-----------|
-| `stats_2d` | 统计二维 | 10 | 5 (box, violin, scatter, volcano, forest) |蛋 |
-| `domain_2d` | 学科二维 | 20 | 28 |
+| `stats_2d` | 统计二维 | 10 | 10 (box, violin, scatter, bar, column, line, histogram, area, volcano, forest) |
+| `domain_2d` | 学科二维 | 20 | 29 |
 | `plots_3d` | 三维图型 | 30 | 11 |
 | `maps` | 地理地图 | 40 | 7 |
 
 **别名系统**：`_ROUTE_ALIASES` 字典包含 100+ 个体别名映射，支持中英文别名（如"箱线图"→"box"、"火山图"→"volcano"）和多种拼写变体（如"scatter_3d"→"plot3d_scatter"）。
 
-**依赖提示**：`PLOT_DEPENDENCY_HINTS` 标注各图型需要的 extra（如 domain_2d → "data"，isosurface3d / embedding → "ml"，maps → "maps"，raster → "raster"）。
+**依赖提示**：`PLOT_DEPENDENCY_HINTS` 标注各图型所需依赖；高级三维图型使用 `ml`，地图使用 `maps`。表格读取依赖 pandas/openpyxl、栅格读取依赖 rasterio，均在基础依赖中。
 
 ### 4.3 分发执行器（`src/dispatch/executor.py`）
 
@@ -285,25 +291,24 @@ src/save/export.py → finalize_plot_output() → save figure + plt.show/close
 
 ### 4.7 前端架构（`web/frontend/src/`）
 
-**根组件** `App.vue`：顶部菜单栏（工作区/数据集/操作/关于/用户手册）+ 左侧导航 + 主内容区
+**根组件** `App.vue`：左侧可折叠和调宽的导航、首页、绘图工作区，以及资产管理和设置弹窗。设置弹窗含基础设置、关于、用户手册；资产管理弹窗含渲染历史和渲染文件。
 
 **核心组件**：
 - `TopBar.vue` — 顶部导航栏
 - `PlotSelector.vue` — 图型分组选择器
 - `DataInput.vue` — 文件上传 + 表格录入
 - `RenderPanel.vue` — 渲染控制面板
+- `HomePage.vue` — 首页介绍与产品入口
+- `AssetManagementPage.vue` — 渲染历史和本地渲染文件管理
 - `ManualPage.vue` — 用户手册页（读取 `ResearchDrawApp_使用手册.md`）
-- `AboutPage.vue` — 关于页（读取 `web/assets` 素材）
+- `AboutPage.vue` — 关于页（版本、项目简介、57 种图型目录与联系方式）
 
 **状态管理**：
 - `useResearchDrawState.js` — 响应式状态（composition API）
 - `useResearchDrawStore.js` — 持久化存储
 
 **启动流程**：
-```
-npm run sync:version → 同步 VERSION 到 package.json
-npm run dev → Vite 启动（端口 5173）
-```
+从项目根目录运行 `uv run --extra web --extra ml --extra maps python scripts/dev_web.py`，同时启动 FastAPI 和 Vite。
 
 ### 4.8 配置系统（`src/config.py` + `.env`）
 
@@ -319,7 +324,7 @@ npm run dev → Vite 启动（端口 5173）
 ### 4.9 版本管理
 
 单一版本源策略：
-- `VERSION` 文件 → 唯一版本源（`0.1.4`）
+- `VERSION` 文件 → 唯一版本源（`0.1.5`）
 - `src/version.py` → 自动读取 `VERSION` 文件，回退到 package metadata
 - `web/frontend` → `npm run sync:version` 注入 `package.json`
 
@@ -407,6 +412,9 @@ uv run python scripts/smoke_domain_plots.py   # 领域图 smoke
 ### 核心依赖（`[project] dependencies`）
 - `numpy>=1.23,<3.0`
 - `matplotlib>=3.7,<4.0`
+- `pandas>=1.5,<3.0`
+- `openpyxl>=3.1,<4.0`
+- `rasterio>=1.5.1`
 - `python-dotenv>=1.0,<2.0`
 - `pydantic>=2.8,<3.0`
 - `PyYAML>=6.0,<7.0`
@@ -415,11 +423,11 @@ uv run python scripts/smoke_domain_plots.py   # 领域图 smoke
 
 | Extra | 用途 | 包含包 |
 |-------|------|--------|
-| `data` | 文件读取（CSV/Excel） | pandas, openpyxl |
+| `data` | 文件读取（CSV/Excel；依赖已包含在基础环境） | pandas, openpyxl |
 | `stats` | 统计增强 | scipy |
 | `ml` | 机器学习/高级图型 | scikit-learn, scikit-image, statsmodels, umap-learn, upsetplot |
 | `maps` | 地图与空间分析 | geopandas, shapely, mapclassify, pyogrio, fiona |
-| `raster` | 栅格数据 | rasterio |
+| `raster` | 栅格数据（依赖已包含在基础环境） | rasterio |
 | `web` | Web 后端 | fastapi, uvicorn, python-multipart |
 | `test` | 测试与质量检查 | pytest, ruff, mypy, types-PyYAML, types-requests |
 | `all` | 全量依赖 | 以上所有 |
@@ -432,7 +440,7 @@ uv run python scripts/smoke_domain_plots.py   # 领域图 smoke
 - **构建工具**：Vite
 - **测试**：Vitest
 - **Lint**：ESLint
-- **版本同步**：`scripts/sync-version.mjs` 读取根目录 `VERSION` 注入 `package.json`
+- **版本同步**：`web/frontend/scripts/sync-version.mjs` 读取根目录 `VERSION` 注入 `package.json`
 - **API 通信**：Axios 或 fetch 调用 FastAPI REST 接口
 - **CORS**：允许 `http://127.0.0.1:5173` 和 `http://localhost:5173`
 
@@ -440,9 +448,9 @@ uv run python scripts/smoke_domain_plots.py   # 领域图 smoke
 
 ## 十、许可与版权
 
-- **许可证**：Apache License 2.0
+- **许可证**：MIT License（品牌素材与名称标识不包含在软件许可证授权范围内）
 - **版权方**：柯影数智（Keying Digital Intelligence）
-- **联系信息**：`web/assets/` 目录下的二维码图片（小红书、微信公众号、微信服务号、粉丝群）
+- **联系信息**：`web/assets/images/` 下的联系方式图片（小红书、微信公众号、粉丝群）；微信服务号素材已移除
 
 ---
 
@@ -464,25 +472,25 @@ uv run python scripts/smoke_domain_plots.py   # 领域图 smoke
 
 | 路径 | 状态 | 说明 |
 |------|------|------|
-| `VERSION` | ✅ 存在 | 版本源 `0.1.4` |
+| `VERSION` | ✅ 存在 | 版本源 `0.1.5` |
 | `pyproject.toml` | ✅ 存在 | 依赖与打包配置 |
 | `uv.lock` | ✅ 存在 | 锁定依赖 |
 | `README.md` | ✅ 存在 | 项目说明 |
 | `ResearchDrawApp_使用手册.md` | ✅ 存在 | 用户手册 |
 | `web/README.md` | ✅ 存在 | Web 模块说明 |
 | `scripts/README.md` | ✅ 存在 | 脚本层说明 |
-| `src/` | ✅ 完整 | 核心源码（42 个 Python 文件） |
-| `tests/` | ✅ 完整 | 11 个 pytest 测试文件 |
-| `scripts/` | ✅ 完整 | 8 个运维脚本 |
+| `src/` | ✅ 完整 | 核心源码（52 个 Python 文件） |
+| `tests/` | ✅ 完整 | 12 个 pytest 测试文件 |
+| `scripts/` | ✅ 完整 | 10 个 Python 运维脚本 |
 | `web/backend/app.py` | ✅ 完整 | FastAPI 主应用 |
 | `web/frontend/src/` | ✅ 完整 | Vue3 前端源码 |
 | `data/` | ✅ 完整 | demo 数据 + 离线底图 |
 | `outputs/` | ✅ 存在 | 输出目录 |
 | `.github/workflows/ci.yml` | ✅ 存在 | CI 流水线 |
 | `.env` | ✅ 存在 | 运行时环境变量 |
-| `LICENSE` | ✅ 存在 | Apache 2.0 |
+| `LICENSE` | ✅ 存在 | MIT |
 | `requirements.txt` | ✅ 存在 | 依赖备选声明 |
 
 ---
 
-*本文档为 Research Draw v0.1.4 项目留档，用于项目交接、架构回顾与知识沉淀。*
+*本文档记录 Research Draw v0.1.5 开发版本的项目结构、能力与配置；该版本尚未发布。*

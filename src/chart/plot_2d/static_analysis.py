@@ -7,7 +7,7 @@
 
 """
 static_analysis — 顶刊常用科研图 · OOP 版（稳定修复）
-支持：箱线图 / 小提琴图 / 散点+拟合 / 火山图 / 森林图
+支持：箱线图 / 小提琴图 / 散点+拟合 / 条形图 / 柱状图 / 折线图 / 直方图 / 面积图 / 火山图 / 森林图
 扩展：MA / GSEA / 富集 Dotplot / Embedding(PCA/UMAP) / UpSet / KM / ROC-PR / Calibration /
       Bland-Altman / DCA / Stress-Strain / XRD / Raman(FTIR) / Phase / Hysteresis /
       Spectral / Index TS / Confusion / Class Dist / Candlestick / CumReturn+DD /
@@ -50,6 +50,11 @@ __all__ = [
     "scatter_with_fit",
     "volcano_plot",
     "forest_plot",
+    "bar_plot",
+    "column_plot",
+    "line_plot",
+    "histogram_plot",
+    "area_plot",
     "ma_plot",
     "enrichment_dotplot",
     "gsea_running_plot",
@@ -130,6 +135,7 @@ def _apply_axes_text(ax: plt.Axes, title: Optional[str], xlabel: Optional[str], 
 
 
 from src.chart.plot_2d.plotters.static import biomed as _biomed
+from src.chart.plot_2d.plotters.static import basic as _basic
 from src.chart.plot_2d.plotters.static import clinical as _clinical
 from src.chart.plot_2d.plotters.static import finance as _finance
 from src.chart.plot_2d.plotters.static import materials as _materials
@@ -578,6 +584,24 @@ class StaticAnalysisPlotter:
         return fig, ax
 
     # -----------------------------
+    # General-purpose 2D charts
+    # -----------------------------
+    def bar_plot(self, *args, **kwargs):
+        return _basic.bar_chart(self, *args, horizontal=True, **kwargs)
+
+    def column_plot(self, *args, **kwargs):
+        return _basic.bar_chart(self, *args, horizontal=False, **kwargs)
+
+    def line_plot(self, *args, **kwargs):
+        return _basic.line_chart(self, *args, **kwargs)
+
+    def histogram_plot(self, *args, **kwargs):
+        return _basic.histogram_chart(self, *args, **kwargs)
+
+    def area_plot(self, *args, **kwargs):
+        return _basic.area_chart(self, *args, **kwargs)
+
+    # -----------------------------
     # 6) MA Plot（生物）
     # -----------------------------
     def ma_plot(self, *args, **kwargs):
@@ -698,6 +722,26 @@ def volcano_plot(*args, **kwargs):
 
 def forest_plot(*args, **kwargs):
     return _get_default_plotter().forest_plot(*args, **kwargs)
+
+
+def bar_plot(*args, **kwargs):
+    return _get_default_plotter().bar_plot(*args, **kwargs)
+
+
+def column_plot(*args, **kwargs):
+    return _get_default_plotter().column_plot(*args, **kwargs)
+
+
+def line_plot(*args, **kwargs):
+    return _get_default_plotter().line_plot(*args, **kwargs)
+
+
+def histogram_plot(*args, **kwargs):
+    return _get_default_plotter().histogram_plot(*args, **kwargs)
+
+
+def area_plot(*args, **kwargs):
+    return _get_default_plotter().area_plot(*args, **kwargs)
 
 
 def ma_plot(*args, **kwargs):

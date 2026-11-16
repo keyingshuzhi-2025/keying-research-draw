@@ -116,6 +116,15 @@ def roc_pr_plot(
     else:
         yb = (yt == pos_label).astype(int)
 
+    def _trapezoidal_area(y_values, x_values) -> float:
+        y_array = np.asarray(y_values, dtype=float)
+        x_array = np.asarray(x_values, dtype=float)
+        if hasattr(np, "trapezoid"):
+            return float(np.trapezoid(y_array, x_array))
+        if x_array.size < 2:
+            return 0.0
+        return float(np.sum(np.diff(x_array) * (y_array[1:] + y_array[:-1]) * 0.5))
+
     curve = curve.lower()
     try:
         from sklearn import metrics  # type: ignore
@@ -133,12 +142,12 @@ def roc_pr_plot(
         if curve == "roc":
             tpr = tps / max(1, tps[-1])
             fpr = fps / max(1, fps[-1])
-            auc = float(np.trapz(tpr, fpr))
+            auc = _trapezoidal_area(tpr, fpr)
         else:
             recall = tps / max(1, tps[-1])
             precision = tps / np.maximum(1, tps + fps)
             fpr, tpr = recall, precision
-            auc = float(np.trapz(tpr, fpr))
+            auc = _trapezoidal_area(tpr, fpr)
 
     fig, ax = self._new_subplots(figsize)
     ax.plot(fpr, tpr, lw=2.0, color="#2563EB", label=f"AUC={auc:.3f}")

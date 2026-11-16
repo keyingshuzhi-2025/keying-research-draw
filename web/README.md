@@ -2,10 +2,9 @@
 
 > 柯影数智团队开发
 >
-> 当前版本：`v0.1.4`
+> 当前开发版本：`v0.1.5`（尚未发布）
 
-Web 模块基于 CLI 能力封装，提供面向终端用户的一体化科研绘图流程。
-建议统一使用 `uv run` 启动（`uv run python -m src.main`、`uv run uvicorn web.backend.app:app`），避免运行时路径和依赖环境差异。
+Web 模块基于 CLI 能力封装，提供面向终端用户的一体化科研绘图流程。项目根目录的 `VERSION` 是唯一版本来源；前后端版本均同步到 `v0.1.5`。
 
 版本统一策略：
 
@@ -17,17 +16,13 @@ Web 模块基于 CLI 能力封装，提供面向终端用户的一体化科研�
 
 - `web/backend/app.py`：FastAPI API 服务（上传、渲染、文件管理、手册/联系方式接口）
 - `web/frontend/`：Vue3 + Vite 前端
-- `web/assets/`：关于页联系方式素材目录（二维码/图片）
+- `web/assets/`：品牌素材与关于页联系方式图片
 
 ## 当前前端能力
 
-- 顶部菜单栏：
-  - 工作区 / 数据集 / 操作
-  - 关于页面
-  - 用户手册页面
-- 左侧导航：
-  - 工作区模式下显示流程导航
-  - 关于/手册模式下显示页面导航
+- 左侧主导航：首页、绘图工作区，以及底部的资产管理与设置入口；导航可折叠并拖动调整宽度
+- 首页介绍产品能力、图型类别与工作流程
+- 绘图工作区：步骤一至三在独立可滚动区域内，渲染结果位于单独的预览栏
 - 数据输入：
   - 上传文件（CSV/TSV/TXT/XLSX/XLS）
   - 页面表格录入并保存为数据集
@@ -36,35 +31,31 @@ Web 模块基于 CLI 能力封装，提供面向终端用户的一体化科研�
   - 图型分组选择
   - 图标题、`xlabel/ylabel/zlabel` 与数据集输入解耦
   - 顶部主按钮一键渲染
-- 文件与历史管理：
-  - 上传文件列表（使用/删除/清空）
-  - 渲染历史（复用配置/打开结果/删除记录+文件）
-  - 本地渲染文件列表（打开/删除/清空）
-- 信息页：
-  - 关于页面读取 `web/assets` 联系方式素材
-  - 用户手册页面读取 `ResearchDrawApp_使用手册.md`，前端按 Markdown 渲染
+- 资产管理弹窗：渲染历史（复用配置/打开结果/删除记录）与本地渲染文件列表（打开/删除/清空）
+- 设置弹窗：基础设置、关于、用户手册三个子页面；后端服务地址、连接检查和图型目录刷新放在基础设置
+- 关于页面显示当前版本、项目介绍、57 种图型目录和联系方式；联系方式素材从 `web/assets/images/` 读取，不包含微信服务号
+- 用户手册在设置子页面中读取 `ResearchDrawApp_使用手册.md` 并按 Markdown 渲染
 
 ## 启动方式
 
-### 1) 启动后端
+### 一键启动前后端
 
-在项目根目录执行：
-
-```bash
-uv sync --extra web --extra data --extra ml --extra maps --extra raster
-uv run uvicorn web.backend.app:app --reload --host 127.0.0.1 --port 8000
-```
-
-### 2) 启动前端
+首次运行前，在项目根目录安装依赖：
 
 ```bash
-cd web/frontend
-npm install
-npm run sync:version
-npm run dev
+uv sync --extra web --extra ml --extra maps
+npm --prefix web/frontend install
 ```
 
-前端质量检查：
+之后从项目根目录执行一条命令：
+
+```bash
+uv run --extra web --extra ml --extra maps python scripts/dev_web.py
+```
+
+该脚本同时启动 FastAPI 后端和 Vite 前端；按 `Ctrl+C` 会一起停止。默认地址为 `http://127.0.0.1:8000`（后端）和 `http://127.0.0.1:5173`（前端）。
+
+前端质量检查（按需执行）：
 
 ```bash
 cd web/frontend
@@ -78,7 +69,7 @@ npm run build
 - 前端：`http://127.0.0.1:5173`
 - 后端：`http://127.0.0.1:8000`
 
-前端可在“后端连接（高级设置）”中修改 API 地址。
+后端服务地址可在左侧“设置 → 基础设置”修改，也可在同一页面检查连接和刷新图型目录。
 
 ## 后端 API
 
@@ -86,7 +77,7 @@ npm run build
 - `GET /api/version`
 - `GET /api/plots`
 - `GET /api/plot-registry`：图型注册中心（分组/别名/必需字段/默认参数/依赖提示/demo 信息）
-- `GET /api/contact-assets`：读取 `web/assets` 下可展示图片
+- `GET /api/contact-assets`：读取 `web/assets/images/` 下的联系方式图片
 - `GET /api/user-manual`：读取项目手册 Markdown 文本
 - `POST /api/upload`
 - `GET /api/uploads`（支持 `page` / `page_size` 分页；返回 `usage_bytes` / `quota_bytes`）

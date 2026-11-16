@@ -59,7 +59,9 @@ def test_session_workspace_maps_under_host_root_for_http(tmp_path: Path, monkeyp
 
     assert location.runtime_root == mount_root / "conversation-a"
     assert location.host_root == host_workspace
-    assert resolve_workspace_location(str(host_workspace).lstrip("/")) == location
+
+    with pytest.raises(WorkspaceError, match="绝对路径"):
+        resolve_workspace_location(str(host_workspace).lstrip("/"))
 
     with pytest.raises(WorkspaceError, match="绝对路径"):
         resolve_workspace_location("unrelated/conversation-a")

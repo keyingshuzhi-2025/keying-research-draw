@@ -1,0 +1,21 @@
+{
+  "name": "柯影智绘 Atlas",
+  "short_name": "Atlas",
+  "description": "Research Draw 科研绘图工作台",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0B2451",
+  "theme_color": "#0B2451",
+  "icons": [
+    {
+      "src": "/android-chrome-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/android-chrome-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

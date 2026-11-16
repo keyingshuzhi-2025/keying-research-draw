@@ -125,6 +125,8 @@ celerybeat.pid
 # Environments
 .env
 .venv
+.dsh/
+.DS_Store
 env/
 venv/
 ENV/

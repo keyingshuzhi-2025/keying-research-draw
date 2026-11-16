@@ -4,7 +4,8 @@ import json
 
 import pytest
 
-from src.cli.parser import build_parser, merge_args_with_config
+from src.cli.parser import build_parser, merge_args_with_config, print_examples_and_exit
+from src.registry.plot_registry import ALL_PUBLIC_PLOTS
 
 
 def test_parser_basic_args():
@@ -111,3 +112,13 @@ def test_config_schema_rejects_unknown_key(tmp_path):
     args = parser.parse_args(argv)
     with pytest.raises(ValueError):
         merge_args_with_config(parser, args, argv=argv)
+
+
+def test_help_examples_contains_a_demo_command_for_every_plot(capsys):
+    with pytest.raises(SystemExit) as exit_info:
+        print_examples_and_exit()
+
+    assert exit_info.value.code == 0
+    output = capsys.readouterr().out
+    for plot_name in ALL_PUBLIC_PLOTS:
+        assert f"--mode demo --plot {plot_name} " in output

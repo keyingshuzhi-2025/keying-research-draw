@@ -6,6 +6,13 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, ValidationError, create_model
 
 
+_COMMA_SEPARATED_CONFIG_FIELDS = {
+    "x", "y", "z", "u", "v", "w", "scalar", "log2fc", "pvals", "labels",
+    "forest_labels", "effects", "ci_low", "ci_high", "weights", "thresholds",
+    "countries", "highlight", "set_cols",
+}
+
+
 def _is_append_action(action: argparse.Action) -> bool:
     return action.__class__.__name__ == "_AppendAction"
 
@@ -18,9 +25,11 @@ def _is_boolean_flag_action(action: argparse.Action) -> bool:
     )
 
 
-def _infer_field_type(actions: list[argparse.Action]) -> Any:
+def _infer_field_type(actions: list[argparse.Action], dest: str) -> Any:
     if any(_is_append_action(a) for a in actions):
         return list[str] | str | None
+    if dest in _COMMA_SEPARATED_CONFIG_FIELDS:
+        return str | list[str | int | float] | None
     if actions and all(_is_boolean_flag_action(a) for a in actions):
         return bool | None
 
@@ -47,7 +56,7 @@ def build_cli_config_model(parser: argparse.ArgumentParser) -> type[BaseModel]:
 
     fields: dict[str, tuple[Any, Any]] = {}
     for dest, actions in dest_to_actions.items():
-        fields[dest] = (_infer_field_type(actions), None)
+        fields[dest] = (_infer_field_type(actions, dest), None)
 
     return create_model(
         "CLIConfigModel",
@@ -67,6 +76,10 @@ def validate_cli_config_payload(
         raise ValueError(f"配置文件 schema 校验失败：\n{exc}") from exc
 
     result = validated.model_dump(exclude_none=True)
+    for dest in _COMMA_SEPARATED_CONFIG_FIELDS:
+        value = result.get(dest)
+        if isinstance(value, list):
+            result[dest] = ",".join(str(item) for item in value)
     # argparse append 选项统一成 list，便于后续 merge 行为一致。
     append_dests = {
         action.dest

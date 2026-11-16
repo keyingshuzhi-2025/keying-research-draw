@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-label="柯影智绘 Atlas 品牌图形"><defs>
+ <linearGradient id="gBase" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#061B48"/><stop offset="0.6" stop-color="#104B9D"/><stop offset="1" stop-color="#2188F1"/></linearGradient>
+ <linearGradient id="gRight" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#6AE3FF"/><stop offset="0.43" stop-color="#2B86FE"/><stop offset="1" stop-color="#275FE3"/></linearGradient>
+ <linearGradient id="gLeft" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#FFFFFF"/><stop offset="1" stop-color="#CAE4FF"/></linearGradient>
+ <linearGradient id="gOrbit" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#12DABD"/><stop offset="0.52" stop-color="#11CFF1"/><stop offset="1" stop-color="#28A1FA"/></linearGradient>
+ <linearGradient id="gBars" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#17DEBB"/><stop offset="1" stop-color="#207FFC"/></linearGradient>
+ <linearGradient id="gLightSymbol" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0C346C"/><stop offset="1" stop-color="#2B6FDC"/></linearGradient>
+ </defs><rect width="128" height="128" rx="28" fill="url(#gBase)"/>
+<path d="M25 102L52 30Q54 26 59 26H70L40 102Z" fill="#FFFFFF"/>
+<path d="M70 26Q74 26 76 30L104 102H87L65 49Z" fill="#44B4FD"/>
+<path d="M29 83Q58 106 104 69" fill="none" stroke="#18D6D2" stroke-width="6" stroke-linecap="round"/>
+<circle cx="45" cy="90" r="5.5" fill="#0DE0BF" stroke="white" stroke-width="2.5"/>
+<circle cx="91" cy="79" r="5.5" fill="#28A2FA" stroke="white" stroke-width="2.5"/></svg>

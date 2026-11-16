@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: Stable release tag to publish, such as v0.1.4
+        description: Stable release tag to publish, such as v0.1.5
         required: true
         type: string
 
@@ -33,10 +33,18 @@ jobs:
 
       - name: Validate release tag and project version
         env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          REF_TYPE: ${{ github.ref_type }}
           RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
         run: |
           if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "Expected a stable version tag such as v0.1.4; got: $RELEASE_TAG" >&2
+            echo "Expected a stable version tag such as v0.1.5; got: $RELEASE_TAG" >&2
+            exit 1
+          fi
+
+          if [[ "$EVENT_NAME" == "workflow_dispatch" && ( "$REF_TYPE" != "tag" || "$REF_NAME" != "$RELEASE_TAG" ) ]]; then
+            echo "For a manual retry, select the existing release tag as the workflow ref and enter the same tag." >&2
             exit 1
           fi
 

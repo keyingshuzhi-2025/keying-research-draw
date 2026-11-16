@@ -1,7 +1,6 @@
 
 import json
 import argparse
-from pathlib import Path
 from typing import Any, Dict
 
 from src.registry import (

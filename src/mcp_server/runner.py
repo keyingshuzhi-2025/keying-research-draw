@@ -14,11 +14,13 @@ from typing import Any, Dict, Optional, Tuple
 from uuid import uuid4
 
 from src.main import ResearchDrawApp
-from src.mcp_server.workspace import MCPWorkspace, WorkspaceError
+from src.mcp_server.workspace import MCPWorkspace, WorkspaceError, resolve_workspace_selector
 
 
 _RENDER_LOCK = threading.RLock()
 _OUTPUT_FORMATS = {"png", "svg", "pdf"}
+_BOOLEAN_FALSE_FLAGS = {"grid": "--no-grid"}
+_REPEATED_CONFIG_FLAGS = {"group"}
 
 
 def _dest_to_arg_flag(dest: str) -> str:
@@ -51,7 +53,7 @@ def _build_argv_from_config(
 
     # Handle special cases first
     if mode == "file" and config.get("file"):
-        argv.extend(["--file", str(config["file"])])
+        argv.append(f"--file={config['file']}")
 
     # Add all other config parameters
     for key, value in config.items():
@@ -67,17 +69,24 @@ def _build_argv_from_config(
         if isinstance(value, bool):
             if value:
                 argv.extend([_dest_to_arg_flag(key)])
-            # If False, we don't add the flag (default behavior)
+            elif key in _BOOLEAN_FALSE_FLAGS:
+                argv.append(_BOOLEAN_FALSE_FLAGS[key])
             continue
 
         # Handle list-like parameters (e.g., --group can be repeated)
         if isinstance(value, (list, tuple)):
-            for item in value:
-                argv.extend([_dest_to_arg_flag(key), str(item)])
+            if key in _REPEATED_CONFIG_FLAGS:
+                for item in value:
+                    argv.append(f"{_dest_to_arg_flag(key)}={item}")
+            else:
+                values = ",".join(str(item) for item in value)
+                argv.append(f"{_dest_to_arg_flag(key)}={values}")
             continue
 
         # Handle all other parameter types
-        argv.extend([_dest_to_arg_flag(key), str(value)])
+        # Keep values attached to the option so argparse accepts negative
+        # scalars and comma-separated vectors (for example --u=-0.2,-0.1).
+        argv.append(f"{_dest_to_arg_flag(key)}={value}")
 
     return argv
 
@@ -91,12 +100,21 @@ class ResearchDrawMCPRunner:
         workspace_root: str | Path | None = None,
         *,
         display_workspace_root: str | Path | None = None,
+        shared_workspace_root: str | Path | None = None,
+        display_shared_workspace_root: str | Path | None = None,
     ):
         self.project_root = Path(project_root or Path(__file__).resolve().parents[2]).resolve()
+        if workspace_root is None:
+            location = resolve_workspace_selector()
+            workspace_root = location.runtime_root
+            if display_workspace_root is None:
+                display_workspace_root = location.host_root
         self.workspace = MCPWorkspace(
             workspace_root,
             self.project_root,
             display_root=display_workspace_root,
+            shared_workspace_root=shared_workspace_root,
+            display_shared_workspace_root=display_shared_workspace_root,
         )
         self.output_dir = self.workspace.output_dir
 
@@ -188,6 +206,22 @@ class ResearchDrawMCPRunner:
                 if not output_path.is_file():
                     return False, "绘图已执行，但没有在工作区输出目录中找到本次生成的图片。", None
                 self.workspace._ensure_inside_workspace(output_path)
-                return True, f"Successfully rendered {plot}", output_path
+                message = f"Successfully rendered {plot}"
+                try:
+                    self.workspace.save_render_manifest(
+                        save_name,
+                        mode,
+                        plot,
+                        {key: value for key, value in safe_config.items() if key != "no_show"},
+                    )
+                except Exception as manifest_error:
+                    message += f"（绘图记录未保存，无法调整重绘：{manifest_error}）"
+                return True, message, output_path
+            except SystemExit as e:
+                return (
+                    False,
+                    f"绘图参数解析失败（CLI 退出码：{e.code}）；请检查传入的绘图参数。",
+                    None,
+                )
             except Exception as e:
                 return False, f"Error rendering plot: {str(e)}", None

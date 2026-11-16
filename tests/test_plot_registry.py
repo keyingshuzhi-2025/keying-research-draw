@@ -7,6 +7,7 @@ from src.registry import (
     public_plot_name,
     required_fields_for_plot,
 )
+from src.registry.plot_registry import ALL_PUBLIC_PLOTS, PLOT_DESCRIPTIONS, PLOT_DISPLAY_NAMES, plot_registry_payload
 
 
 def test_registry_group_catalog_basic():
@@ -42,3 +43,14 @@ def test_registry_map_demo_defaults(project_root):
     assert points["lon_col"] == "lon"
     assert points["lat_col"] == "lat"
     assert str(points["file"]).endswith("data/points_cn.csv")
+
+
+def test_every_plot_has_chinese_name_description_and_demo_metadata():
+    payload = plot_registry_payload()
+    assert set(PLOT_DISPLAY_NAMES) == set(ALL_PUBLIC_PLOTS)
+    assert set(PLOT_DESCRIPTIONS) == set(ALL_PUBLIC_PLOTS)
+    for plot_name in ALL_PUBLIC_PLOTS:
+        metadata = payload["plots"][plot_name]
+        assert metadata["display_name"] == PLOT_DISPLAY_NAMES[plot_name]
+        assert metadata["description"] == PLOT_DESCRIPTIONS[plot_name]
+        assert metadata["demo_available"] is True

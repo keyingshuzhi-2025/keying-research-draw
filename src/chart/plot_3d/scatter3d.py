@@ -72,6 +72,34 @@ def _spacing(values: np.ndarray) -> float:
     return float(np.median(finite))
 
 
+def _auto_quiver_length(x: np.ndarray, y: np.ndarray, z: np.ndarray, magnitude: np.ndarray) -> float:
+    """Scale vectors so the largest arrow uses 35% of typical point spacing."""
+    max_magnitude = float(np.max(magnitude)) if magnitude.size else 0.0
+    if not np.isfinite(max_magnitude) or max_magnitude <= 0:
+        return 1.0
+
+    positions = np.column_stack((x, y, z))
+    spacing = 0.0
+    if len(positions) > 1:
+        delta = positions[:, None, :] - positions[None, :, :]
+        distances = np.sqrt(np.sum(delta * delta, axis=2))
+        np.fill_diagonal(distances, np.inf)
+        nearest = np.min(distances, axis=1)
+        nearest = nearest[np.isfinite(nearest) & (nearest > 0)]
+        if nearest.size:
+            spacing = float(np.median(nearest))
+
+    if not np.isfinite(spacing) or spacing <= 0:
+        coordinate_span = max(
+            float(np.ptp(x)),
+            float(np.ptp(y)),
+            float(np.ptp(z)),
+        )
+        spacing = coordinate_span if coordinate_span > 0 else 1.0
+
+    return 0.35 * spacing / max_magnitude
+
+
 def _volume_from_xyzc(x, y, z, c) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     (x_arr, y_arr, z_arr, c_arr), _ = _finite_n(x, y, z, c)
     x_u = np.unique(x_arr)
@@ -320,7 +348,7 @@ class Scatter3DPlotter:
         elev: float = 24.0,
         azim: float = 38.0,
         cmap: str = "viridis",
-        length: float = 0.15,
+        length: Optional[float] = None,
         normalize: bool = False,
         max_arrows: int = 600,
     ) -> Tuple[plt.Figure, plt.Axes, dict]:
@@ -335,6 +363,9 @@ class Scatter3DPlotter:
             v_arr = v_arr[::step]
             w_arr = w_arr[::step]
         mag = np.sqrt(u_arr ** 2 + v_arr ** 2 + w_arr ** 2)
+        quiver_length = _auto_quiver_length(x_arr, y_arr, z_arr, mag) if length is None else float(length)
+        if not np.isfinite(quiver_length) or quiver_length <= 0:
+            raise ValueError("quiver3d 的 length 必须是大于 0 的有限数值")
         norm = plt.Normalize(vmin=float(np.min(mag)), vmax=float(np.max(mag) + 1e-12))
         colors = plt.get_cmap(cmap)(norm(mag))
 
@@ -347,7 +378,7 @@ class Scatter3DPlotter:
             u_arr,
             v_arr,
             w_arr,
-            length=float(length),
+            length=quiver_length,
             normalize=bool(normalize),
             colors=colors,
             linewidth=0.8,

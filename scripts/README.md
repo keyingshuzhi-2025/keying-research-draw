@@ -2,12 +2,19 @@
 
 `scripts/` 是项目的“工具脚本层”，和 `tests/`（pytest 自动化测试）完全分离。
 
+适用版本：`v0.1.5`（当前开发版本，尚未发布）；Python 版本为 `3.13.15`，通过 `uv` 管理。
+
 ## 目录定位
 
 - `tests/`：CI/回归自动化测试（由 `pytest` 统一执行）
 - `scripts/`：运维、数据准备、手工 smoke 验证脚本
 
 ## 常用脚本
+
+- `dev_web.py`
+  - 从项目根目录一条命令启动 Web 前端和后端：
+  - `uv run --extra web --extra ml --extra maps python scripts/dev_web.py`
+  - 按 `Ctrl+C` 会同时停止前后端服务。
 
 - `download_basemaps.py`
   - 下载离线底图（Natural Earth + GADM）并可选提取港澳区域

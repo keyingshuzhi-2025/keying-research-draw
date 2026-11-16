@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="880" viewBox="0 0 900 880" role="img" aria-label="柯影智绘 Atlas 品牌图形"><defs>
+ <linearGradient id="gBase" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#061B48"/><stop offset="0.6" stop-color="#104B9D"/><stop offset="1" stop-color="#2188F1"/></linearGradient>
+ <linearGradient id="gRight" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#6AE3FF"/><stop offset="0.43" stop-color="#2B86FE"/><stop offset="1" stop-color="#275FE3"/></linearGradient>
+ <linearGradient id="gLeft" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#FFFFFF"/><stop offset="1" stop-color="#CAE4FF"/></linearGradient>
+ <linearGradient id="gOrbit" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#12DABD"/><stop offset="0.52" stop-color="#11CFF1"/><stop offset="1" stop-color="#28A1FA"/></linearGradient>
+ <linearGradient id="gBars" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#17DEBB"/><stop offset="1" stop-color="#207FFC"/></linearGradient>
+ <linearGradient id="gLightSymbol" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0C346C"/><stop offset="1" stop-color="#2B6FDC"/></linearGradient>
+ </defs><g transform="translate(170,-65) scale(.56)"><path d="M190 781 L422 285 C433 262 446 244 465 242 L568 242 L337 754 C326 781 313 791 289 792 L213 792 C195 792 186 788 190 781Z" fill="url(#gLightSymbol)"/>
+ <path d="M568 242 C589 241 602 253 613 275 L827 761 C836 782 825 792 806 792 L746 792 C734 792 728 786 723 774 L522 343Z" fill="url(#gRight)"/>
+ <g fill="url(#gBars)"><rect x="456" y="535" width="38" height="51" rx="8"/><rect x="509" y="510" width="38" height="76" rx="8"/><rect x="562" y="476" width="38" height="110" rx="8"/></g><g opacity="0.32" fill="none" stroke="#17B7EC" stroke-width="10"><path d="M350 825H695 M315 860H736 M284 901H772 M501 811L393 905 M563 811L567 905 M625 811L712 905"/></g><path d="M159 650 C270 499 755 378 849 454 C933 521 807 612 750 624" fill="none" stroke="url(#gOrbit)" stroke-width="22" stroke-linecap="round"/>
+ <path d="M161 649 C267 746 676 690 837 553" fill="none" stroke="#FFFFFF" stroke-width="32" stroke-linecap="round"/>
+ <path d="M161 649 C267 746 676 690 837 553" fill="none" stroke="url(#gOrbit)" stroke-width="20" stroke-linecap="round"/>
+ <circle cx="275" cy="691" r="26" fill="#0FD9BF" stroke="#FFFFFF" stroke-width="11"/>
+ <circle cx="539" cy="695" r="26" fill="#16B7FB" stroke="#FFFFFF" stroke-width="11"/>
+ <circle cx="817" cy="563" r="26" fill="#247BFC" stroke="#FFFFFF" stroke-width="11"/></g><text x="450" y="686" text-anchor="middle" font-size="96" font-weight="700" fill="#122D4A" font-family="Noto Sans CJK SC, PingFang SC, Microsoft YaHei, sans-serif">柯影智绘</text><text x="450" y="794" text-anchor="middle" font-size="85" font-weight="700" fill="#122D4A" font-family="Go, Arial, sans-serif">Atlas</text></svg>

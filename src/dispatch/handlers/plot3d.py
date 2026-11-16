@@ -214,6 +214,7 @@ class Plot3DHandler:
                 elev=elev,
                 azim=azim,
                 cmap=cmap,
+                length=self.args.length,
                 max_arrows=max(int(self.args.max_arrows or 600), 50),
             )
         else:

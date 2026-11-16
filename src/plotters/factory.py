@@ -27,6 +27,14 @@ def _load_from_candidates(candidates: List[Path], mod_name: str, attr: str):
     raise ImportError(f"未找到 {attr}，候选路径：\n" + "\n".join(str(x) for x in candidates))
 
 
+def _unavailable_map_plotter_cls(error: Exception):
+    class UnavailableMapPlotter:
+        def __init__(self, *args, **kwargs):
+            raise RuntimeError(f"地图绘图模块加载失败：{error}") from error
+
+    return UnavailableMapPlotter
+
+
 def get_static_plotter_cls(src_dir: Path):
     cls = _try_import("src.chart.plot_2d.static_analysis", "StaticAnalysisPlotter")
     if cls is not None:
@@ -52,8 +60,22 @@ def get_map_plotter_cls(src_dir: Path):
         ("src.chart.plot_2d.geo_thematic", "DomainMapPlotter"),
         ("src.chart.plot_2d.domain_analysis", "DomainMapPlotter"),
     ]
+    module_paths = {
+        "src.chart.plot_2d.geo_atlas": src_dir / "chart" / "plot_2d" / "geo_atlas.py",
+        "src.chart.plot_2d.cartography": src_dir / "chart" / "plot_2d" / "cartography.py",
+        "src.chart.plot_2d.geo_thematic": src_dir / "chart" / "plot_2d" / "geo_thematic.py",
+        "src.chart.plot_2d.domain_analysis": src_dir / "chart" / "plot_2d" / "domain_analysis.py",
+    }
+    load_error: Optional[Exception] = None
     for mod, cls_name in candidates_mod_cls:
-        cls = _try_import(mod, cls_name)
+        try:
+            module = __import__(mod, fromlist=[cls_name])
+        except Exception as exc:
+            module_path = module_paths.get(mod)
+            if module_path is not None and module_path.is_file() and load_error is None:
+                load_error = exc
+            continue
+        cls = getattr(module, cls_name, None)
         if cls is not None:
             return cls
 
@@ -69,14 +91,16 @@ def get_map_plotter_cls(src_dir: Path):
         (src_dir / "chart" / "plot_2d" / "geo_thematic.py", "DomainMapPlotter"),
         (src_dir / "chart" / "plot_2d" / "domain_analysis.py", "DomainMapPlotter"),
     ]
-    last_error: Optional[Exception] = None
     for path, attr in file_attr_pairs:
+        if not path.is_file():
+            continue
         try:
             return _load_from_candidates([path], f"{path.stem}_dyn", attr)
         except Exception as e:
-            last_error = e
-    if last_error:
-        return None
+            if load_error is None:
+                load_error = e
+    if load_error is not None:
+        return _unavailable_map_plotter_cls(load_error)
     return None
 
 

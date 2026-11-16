@@ -1,5 +1,7 @@
 from .plot_registry import (
     MODE_ALIASES,
+    PLOT_DESCRIPTIONS,
+    PLOT_DISPLAY_NAMES,
     canonical_plots_by_group,
     default_args_for_plot,
     demo_data_path_for_plot,
@@ -18,6 +20,8 @@ from .plot_registry import (
 
 __all__ = [
     "MODE_ALIASES",
+    "PLOT_DESCRIPTIONS",
+    "PLOT_DISPLAY_NAMES",
     "canonical_plots_by_group",
     "default_args_for_plot",
     "demo_data_path_for_plot",

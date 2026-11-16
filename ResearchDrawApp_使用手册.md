@@ -1,8 +1,8 @@
-# ResearchDrawApp 使用手册（v0.1.4）
+# 柯影智绘 Atlas 使用手册（v0.1.5）
 
-本手册覆盖当前项目的 CLI 与 Web 端能力，内容与仓库最新代码同步。
+本手册对应当前开发版本 `v0.1.5`，介绍 CLI 和 Web 端的安装、图型选择、渲染与结果管理。
 
-版本治理（v0.1.4）：
+版本治理（v0.1.5）：
 
 - 单一版本源：项目根目录 `VERSION`
 - CLI / Web 后端：通过 `src/version.py` 自动读取并注入
@@ -13,33 +13,38 @@
 - Python 固定为 `3.13.15`
 - 使用 `uv` 管理虚拟环境、依赖和锁文件
 - `.python-version` 固定解释器版本，`uv.lock` 固定依赖解析结果
+- 项目 Python 版本要求为 `3.13.15`，请使用项目根目录中的 `.python-version`
 
 ## 1. 工具概览
 
 - CLI 入口：`uv run python -m src.main` 或 `uv run research-draw`
 - Web 入口：`web/backend/app.py` + `web/frontend/`
+- Web 图型目录共 57 种，按统计二维、学科二维、三维和地理地图分组；每种图型都有中文名称、用途说明和 Demo 入口。
 - 支持图型：
-  - 统计二维：`box` / `violin` / `scatter` / `volcano` / `forest`
+  - 统计二维（10 种）：`box` / `violin` / `scatter` / `bar` / `column` / `line` / `histogram` / `area` / `volcano` / `forest`
   - 领域二维：`ma` / `enrich_dot` / `gsea` / `embedding` / `upset` / `km` / `roc` / `calibration` / `bland_altman` / `dca` / `stress_strain` / `xrd` / `raman` / `phase` / `hysteresis` / `spectral_signature` / `index_ts` / `confusion` / `class_dist` / `candlestick` / `cum_return` / `rolling_stats` / `frontier` / `acf_pacf` / `likert` / `raincloud` / `irt_icc` / `factor_loadings` / `interaction`
   - 三维：`scatter3d` / `surface3d` / `wireframe3d` / `contour3d` / `line3d` / `isosurface3d` / `slice3d` / `quiver3d` / `waterfall3d` / `embedding3d` / `mesh3d`
   - 地图：`world` / `world_admin1` / `china` / `choropleth_world` / `choropleth_china` / `raster` / `points`
 
 ## 2. 安装
 
-推荐 Python `3.10+`。
+项目固定使用 Python `3.13.15`。
 
 ```bash
 # 安装/同步基础环境
 uv sync
 
-# 常用组合（Web + 数据 + ML + 地图）
-uv sync --extra web --extra data --extra ml --extra maps --extra raster
+# Web、数据、ML、地图与栅格功能
+uv sync --extra web --extra ml --extra maps
 ```
 
 说明：
 
 - YAML 配置解析依赖 `PyYAML`，已在基础依赖中声明。
-- `isosurface3d` 依赖 `scikit-image`（在 `.[ml]` / `.[all]` 中）。
+- CSV/Excel 文件读取依赖 `pandas`、`openpyxl` 已包含在基础环境中。
+- `bar`、`column`、`line`、`histogram` 和 `area` 可直接用于常见二维绘图。
+- `isosurface3d` 依赖 `scikit-image`（`ml` 扩展）；地图需要 `maps` 扩展；栅格读取依赖 `rasterio`，已包含在基础依赖中。
+- 一次安装全部可选功能可使用 `uv sync --extra all`。
 
 ## 3. CLI 快速使用
 
@@ -54,6 +59,11 @@ uv run python -m src.main --help-examples
 
 ```bash
 uv run python -m src.main --mode demo --plot box --title "箱线图演示"
+uv run python -m src.main --mode demo --plot bar --title "横向条形图示例"
+uv run python -m src.main --mode demo --plot column --title "纵向柱状图示例"
+uv run python -m src.main --mode demo --plot line --title "折线图示例"
+uv run python -m src.main --mode demo --plot histogram --title "直方图示例"
+uv run python -m src.main --mode demo --plot area --title "面积图示例"
 uv run python -m src.main --mode demo --plot confusion --title "Confusion Demo"
 uv run python -m src.main --mode demo --plot scatter3d --title "3D Scatter"
 uv run python -m src.main --mode demo --plot quiver3d --title "3D Vector Field"
@@ -82,36 +92,37 @@ uv run python -m src.main --mode custom --plot volcano --log2fc "0.5,1.2,-1.1" -
 
 ### 4.1 启动
 
-```bash
-# 后端（项目根目录）
-uv run uvicorn web.backend.app:app --reload --host 127.0.0.1 --port 8000
+首次运行前安装依赖：
 
-# 前端
-cd web/frontend
-npm install
-npm run sync:version
-npm run dev
+```bash
+uv sync --extra web --extra ml --extra maps
+npm --prefix web/frontend install
 ```
+
+之后在项目根目录用一条命令启动前端和后端：
+
+```bash
+uv run --extra web --extra ml --extra maps python scripts/dev_web.py
+```
+
+按 `Ctrl+C` 同时停止两个服务。默认前端地址为 `http://127.0.0.1:5173`，后端地址为 `http://127.0.0.1:8000`。
 
 ### 4.2 页面结构
 
-- 顶部菜单栏：
-  - `工作区`、`数据集`、`操作`
-  - `关于页面`
-  - `用户手册页面`
-- 左侧导航栏：
-  - 工作区模式：流程导航
-  - 信息页模式：页面导航
-- 主面板：
-  - 工作区（数据输入、图型选择、图形设置、渲染结果）
-  - 关于页面（展示 `web/assets` 联系方式）
-  - 用户手册页面（读取并渲染本手册 Markdown）
+- 左侧导航栏显示品牌标识和 `v0.1.5` 版本号，可折叠或拖动调整宽度。展开时可进入首页与绘图工作区；导航底部提供资产管理和设置入口。
+- 首页介绍产品、四类图型和主要工作流程，并可直接进入绘图工作区或打开用户手册。
+- 绘图工作区分为两栏：步骤一至三（数据、图型、样式）位于可独立滚动的区域，渲染预览位于另一栏。图型选择页支持按统计二维、学科二维、三维和地理地图筛选，也可搜索；图型卡片区域可纵向滚动。
+- 资产管理以弹窗打开，提供渲染历史和本地渲染文件管理。
+- 设置以弹窗打开，包含基础设置、关于和用户手册。后端服务地址、连接检查和图型目录刷新位于“设置 → 基础设置”。
+- 关于页面位于设置子页面，显示项目介绍、当前版本、图型分组与 57 种图型的用途和 Demo，并提供联系方式。联系方式图片从 `web/assets/images/` 读取，当前包含小红书、微信公众号和粉丝群；不再展示微信服务号。
+- 用户手册位于设置子页面，支持章节目录与章节搜索；正文会在可用宽度内换行显示，并可滚动阅读。
 
 ### 4.3 用户手册页面说明
 
 - 后端接口：`GET /api/user-manual`
 - 返回内容：手册 Markdown 文本
 - 前端渲染：按 Markdown 语义展示（标题、段落、列表、代码块、引用、链接）
+- 手册版本：以本文件标题中的版本为准；请将此文件与 `VERSION` 对齐更新。
 
 ## 5. 数据格式要求
 
@@ -122,6 +133,11 @@ npm run dev
 
 ### 5.2 常用二维图
 
+- `bar`：横向条形图，分类名称较长时便于阅读；需要 `x_col` + `y_col`
+- `column`：纵向柱状图，用于比较类别数值；需要 `x_col` + `y_col`
+- `line`：折线图，用于展示顺序或时间趋势；需要 `x_col` + `y_col`
+- `histogram`：直方图，用于查看连续数据的频数或密度；需要 `value_col`
+- `area`：面积图，用于展示趋势与累计量；需要 `x_col` + `y_col`
 - `scatter`：至少 `x_col` + `y_col`
 - `box` / `violin`：
   - 长表：`group_col` + `value_col`
@@ -257,7 +273,7 @@ cd web/frontend && npm run lint && npm run test && npm run build
 - 地图底图缺失：
   - 检查 `MAP_BASEMAP_ROOT` 或 `--basemap-root`
 - Web 端无法连接后端：
-  - 在左侧“后端连接（高级设置）”中确认 API 地址
+  - 打开左侧底部“设置”，进入“基础设置”，确认服务地址并点击“检查连接”
 - 用户手册页面为空：
   - 检查项目根目录是否存在 `ResearchDrawApp_使用手册.md`
 

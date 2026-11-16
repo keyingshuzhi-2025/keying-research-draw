@@ -1,0 +1,5 @@
+sample,signal,noise
+0,1.25,control-A
+1,2.50,control-B
+2,3.75,treatment-A
+3,5.00,treatment-B

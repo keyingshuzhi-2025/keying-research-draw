@@ -36,6 +36,7 @@ WEB_OUTPUT_ROOT = PROJECT_ROOT / "outputs" / "web"
 UPLOAD_DIR = WEB_OUTPUT_ROOT / "uploads"
 RENDER_DIR = WEB_OUTPUT_ROOT / "renders"
 WEB_ASSETS_DIR = PROJECT_ROOT / "web" / "assets"
+CONTACT_ASSETS_DIR = WEB_ASSETS_DIR / "images"
 USER_MANUAL_FILE = PROJECT_ROOT / "ResearchDrawApp_使用手册.md"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 RENDER_DIR.mkdir(parents=True, exist_ok=True)
@@ -850,11 +851,11 @@ def get_plot_registry() -> Dict[str, Any]:
 
 @app.get("/api/contact-assets", response_model=ContactAssetResponse)
 def list_contact_assets() -> ContactAssetResponse:
-    if not WEB_ASSETS_DIR.exists():
+    if not CONTACT_ASSETS_DIR.exists():
         return ContactAssetResponse(items=[])
 
     items: list[ContactAssetItem] = []
-    for path in sorted(WEB_ASSETS_DIR.rglob("*")):
+    for path in sorted(CONTACT_ASSETS_DIR.rglob("*")):
         if not path.is_file():
             continue
         if path.suffix.lower() not in CONTACT_IMAGE_SUFFIX:

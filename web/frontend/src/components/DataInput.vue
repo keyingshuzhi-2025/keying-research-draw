@@ -34,7 +34,11 @@ const {
 <template>
   <section id="section-data" class="panel section-card">
     <div class="section-head">
-      <h2>数据输入</h2>
+      <div>
+        <span class="section-kicker">步骤 01 · 数据</span>
+        <h2>准备绘图数据</h2>
+        <p class="section-subtitle">上传表格文件，或直接录入少量示例数据。</p>
+      </div>
       <div class="segmented">
         <button :class="{ active: dataSourceMode === 'upload' }" @click="dataSourceMode = 'upload'">文件上传</button>
         <button :class="{ active: dataSourceMode === 'table' }" @click="dataSourceMode = 'table'">表格录入</button>

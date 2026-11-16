@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from src.cli.config_schema import validate_cli_config_payload
+from src.registry.plot_registry import GROUP_META, PLOT_DISPLAY_NAMES, PLOT_GROUPS
 from src.util.dependency_hints import format_missing_dependency
 from src.version import CLI_VERSION
 
@@ -15,7 +16,7 @@ def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         description=(
             "科研绘图：统计图 + 地图（离线底图）\n"
-            "Static (box/violin/scatter/volcano/forest) + "
+            "Static (box/violin/scatter/bar/column/line/histogram/area/volcano/forest) + "
             "3D (scatter3d/surface3d/wireframe3d/contour3d/line3d/isosurface3d/slice3d/quiver3d/waterfall3d/embedding3d/mesh3d) + "
             "Maps (world/china/choropleth/raster/points)"
         ),
@@ -27,7 +28,7 @@ def build_parser() -> argparse.ArgumentParser:
         default="box",
         help=(
             "图类型 plot:\n"
-            "  统计: box/violin/scatter/volcano/forest\n"
+            "  统计: box/violin/scatter/bar/column/line/histogram/area/volcano/forest\n"
             "  3D: scatter3d/surface3d/wireframe3d/contour3d/line3d/"
             "isosurface3d/slice3d/quiver3d/waterfall3d/embedding3d/mesh3d\n"
             "  生物: ma/enrich_dot/gsea/embedding(pca|umap)/upset\n"
@@ -54,8 +55,23 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--version", action="store_true", help="显示版本并退出")
 
     p.add_argument("--group", action="append", help="重复使用：组数据，如 'Ctrl: 1,2,3'；repeat for multiple groups")
-    p.add_argument("--x", type=str, help="散点X数组，如 '1,2,3' 或 '[1,2,3]' / x values")
-    p.add_argument("--y", type=str, help="散点Y数组，如 '4,5,6' 或 '[4,5,6]' / y values")
+    p.add_argument("--x", type=str, help="X数组，如 '1,2,3'、'A,B,C' 或 '[1,2,3]' / x values")
+    p.add_argument("--y", type=str, help="Y数值数组，如 '4,5,6' 或 '[4,5,6]' / y values")
+    p.add_argument("--aggregation", choices=("mean", "median", "sum"), default="mean", help="重复类别/时间点的汇总方式")
+    p.add_argument("--group-mode", choices=("grouped", "stacked"), default="grouped", help="条形图/柱状图分组展示方式")
+    p.add_argument("--show-values", action="store_true", help="在条形图/柱状图上显示数值")
+    p.add_argument("--tick-rotation", type=float, default=0, help="分类刻度标签旋转角度")
+    p.add_argument("--palette", type=str, default="tab10", help="Matplotlib 配色方案名称")
+    p.add_argument("--marker", type=str, default="o", help="折线图数据点标记；空字符串表示不显示标记")
+    p.add_argument("--line-width", type=float, default=2.0, help="折线图线宽")
+    p.add_argument("--bins", type=int, default=20, help="直方图分箱数")
+    p.add_argument("--density", action="store_true", help="直方图纵轴使用概率密度")
+    p.add_argument("--hist-alpha", type=float, default=0.68, help="直方图填充透明度")
+    p.add_argument("--area-alpha", type=float, default=0.28, help="面积图填充透明度")
+    p.add_argument("--stacked", action="store_true", help="面积图使用堆叠模式")
+    p.add_argument("--grid", dest="grid", action="store_true", help="显示基础二维图网格线")
+    p.add_argument("--no-grid", dest="grid", action="store_false", help="关闭基础二维图网格线")
+    p.set_defaults(grid=True)
     p.add_argument("--z", type=str, help="3D散点Z数组，如 '7,8,9' 或 '[7,8,9]' / z values")
     p.add_argument("--u", type=str, help="3D 向量 U 数组 / 3D vector U values")
     p.add_argument("--v", type=str, help="3D 向量 V 数组 / 3D vector V values")
@@ -72,6 +88,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--slice-y", type=float, default=None, help="3D 切片 y 位置")
     p.add_argument("--slice-z", type=float, default=None, help="3D 切片 z 位置")
     p.add_argument("--max-arrows", type=int, default=600, help="3D 矢量图最多箭头数量")
+    p.add_argument("--length", type=float, default=None, help="3D 矢量图箭头缩放因子；默认按点间距自动缩放")
     p.add_argument("--ci", type=float, default=0.95, help="散点回归线置信水平（0~1；0 关闭置信带）")
     p.add_argument("--equal", action="store_true", help="散点图使用等比例坐标")
     p.add_argument("--log2fc", type=str, help="火山图log2FC数组 / log2FC array")
@@ -335,6 +352,15 @@ uv run python -m src.main --mode file --plot candlestick --file data/finance/can
 uv run python -m src.main --mode file --plot likert --file data/psych/likert.csv --title "Likert"
 """
     )
+    print("\n# 每种图型的内置 Demo（按图型分组）")
+    for group_key, plot_names in PLOT_GROUPS.items():
+        print(f"\n## {GROUP_META[group_key]['label']}")
+        for plot_name in plot_names:
+            label = PLOT_DISPLAY_NAMES.get(plot_name, plot_name)
+            print(
+                f'uv run python -m src.main --mode demo --plot {plot_name} '
+                f'--title "{label}示例"'
+            )
     sys.exit(0)
 
 

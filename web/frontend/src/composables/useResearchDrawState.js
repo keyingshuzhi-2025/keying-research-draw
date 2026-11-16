@@ -2,9 +2,69 @@ import { computed, reactive, ref } from "vue";
 
 export function useResearchDrawState() {
   const TOOL_NAME = "柯影智绘 Atlas";
-  const TOOL_SUBTITLE = "柯影数智团队开发";
+  const TOOL_SUBTITLE = "科研绘图工作台";
 
   const GROUP_ORDER = ["stats_2d", "domain_2d", "plots_3d", "maps"];
+
+  const PLOT_DISPLAY_NAMES = {
+    box: "箱线图",
+    violin: "小提琴图",
+    scatter: "散点回归图",
+    bar: "横向条形图",
+    column: "纵向柱状图",
+    line: "折线图",
+    histogram: "直方图",
+    area: "面积图",
+    volcano: "火山图",
+    forest: "森林图",
+    ma: "MA 均值-差异图",
+    enrich_dot: "富集气泡图",
+    gsea: "GSEA 富集曲线",
+    embedding: "降维散点图（PCA/UMAP）",
+    upset: "UpSet 集合交集图",
+    km: "Kaplan–Meier 生存曲线",
+    roc: "ROC/PR 评估曲线",
+    calibration: "概率校准曲线",
+    bland_altman: "Bland–Altman 一致性图",
+    dca: "决策曲线分析图",
+    stress_strain: "应力-应变曲线",
+    xrd: "X 射线衍射图（XRD）",
+    raman: "拉曼/红外光谱图",
+    phase: "材料相图",
+    hysteresis: "磁滞/滞回曲线",
+    spectral_signature: "遥感光谱特征曲线",
+    index_ts: "遥感指数时序图",
+    confusion: "分类混淆矩阵",
+    class_dist: "地物类别分布图",
+    candlestick: "金融 K 线图",
+    cum_return: "累计收益与回撤图",
+    rolling_stats: "滚动统计图",
+    frontier: "投资组合有效前沿图",
+    acf_pacf: "自相关/偏自相关图",
+    likert: "Likert 量表分布图",
+    raincloud: "雨云分布图",
+    irt_icc: "IRT 项目特征曲线（ICC）",
+    factor_loadings: "因子载荷图",
+    interaction: "交互效应图",
+    scatter3d: "三维散点图",
+    surface3d: "三维曲面图",
+    wireframe3d: "三维线框图",
+    contour3d: "三维等高线图",
+    line3d: "三维轨迹图",
+    isosurface3d: "三维等值面图",
+    slice3d: "三维正交切片图",
+    quiver3d: "三维矢量场图",
+    waterfall3d: "三维瀑布图",
+    embedding3d: "三维降维图",
+    mesh3d: "三维网格图",
+    world: "世界底图",
+    world_admin1: "世界一级行政区图",
+    china: "中国行政区底图",
+    choropleth_world: "世界分级设色地图",
+    choropleth_china: "中国分级设色地图",
+    raster: "栅格影像叠加图",
+    points: "地图点位分布图"
+  };
 
   const GROUP_META_FALLBACK = {
     stats_2d: {
@@ -43,16 +103,20 @@ export function useResearchDrawState() {
       content: "自动识别列名并映射常用字段（x/y/z、group/value、经纬度等），减少手工配置。"
     },
     {
-      title: "科研图型渲染",
-      content: "覆盖统计二维、领域二维、三维图型和离线地图绘图，可导出 PNG/SVG/PDF。"
+      title: "常用二维图型",
+      content: "包含条形图、柱状图、折线图、直方图、面积图，以及箱线图、散点回归图等统计图。"
+    },
+    {
+      title: "每种图型都有演示",
+      content: "全部已登记图型都提供内置 Demo，点选即可快速查看效果。"
     },
     {
       title: "结果与文件管理",
       content: "支持渲染历史复用、上传文件管理、本地渲染文件管理与一键清理。"
     },
     {
-      title: "页面级信息中心",
-      content: "提供关于页面、用户手册页面与联系方式展示，便于团队内外协同使用。"
+      title: "项目资料与帮助",
+      content: "在设置弹窗中查看项目介绍、用户手册与联系方式，集中查阅项目资料。"
     }
   ];
 
@@ -114,6 +178,43 @@ export function useResearchDrawState() {
   };
 
   const DYNAMIC_ARG_DEFS = {
+    bar: [
+      { key: "aggregation", label: "重复类别汇总 (aggregation)", type: "select", default: "mean", options: ["mean", "median", "sum"] },
+      { key: "group_mode", label: "分组显示 (group_mode)", type: "select", default: "grouped", options: ["grouped", "stacked"] },
+      { key: "show_values", label: "显示数值 (show_values)", type: "bool", default: false },
+      { key: "tick_rotation", label: "分类标签旋转角度", type: "number", step: 15, default: 0 },
+      { key: "palette", label: "配色方案 (palette)", type: "select", default: "tab10", options: ["tab10", "Set2", "Dark2", "Paired", "viridis"] },
+      { key: "grid", label: "显示网格线 (grid)", type: "bool", default: true, sendFalse: true }
+    ],
+    column: [
+      { key: "aggregation", label: "重复类别汇总 (aggregation)", type: "select", default: "mean", options: ["mean", "median", "sum"] },
+      { key: "group_mode", label: "分组显示 (group_mode)", type: "select", default: "grouped", options: ["grouped", "stacked"] },
+      { key: "show_values", label: "显示数值 (show_values)", type: "bool", default: false },
+      { key: "tick_rotation", label: "分类标签旋转角度", type: "number", step: 15, default: 0 },
+      { key: "palette", label: "配色方案 (palette)", type: "select", default: "tab10", options: ["tab10", "Set2", "Dark2", "Paired", "viridis"] },
+      { key: "grid", label: "显示网格线 (grid)", type: "bool", default: true, sendFalse: true }
+    ],
+    line: [
+      { key: "aggregation", label: "重复 X 值汇总 (aggregation)", type: "select", default: "mean", options: ["mean", "median", "sum"] },
+      { key: "marker", label: "数据点标记 (marker)", type: "select", default: "o", options: ["o", "s", "^", "D", ""] },
+      { key: "line_width", label: "线宽 (line_width)", type: "number", min: 0.1, step: 0.1, default: 2 },
+      { key: "palette", label: "配色方案 (palette)", type: "select", default: "tab10", options: ["tab10", "Set2", "Dark2", "Paired", "viridis"] },
+      { key: "grid", label: "显示网格线 (grid)", type: "bool", default: true, sendFalse: true }
+    ],
+    histogram: [
+      { key: "bins", label: "分箱数 (bins)", type: "number", min: 1, step: 1, default: 20 },
+      { key: "density", label: "显示概率密度 (density)", type: "bool", default: false },
+      { key: "hist_alpha", label: "填充透明度", type: "number", min: 0.05, max: 1, step: 0.05, default: 0.68 },
+      { key: "palette", label: "配色方案 (palette)", type: "select", default: "tab10", options: ["tab10", "Set2", "Dark2", "Paired", "viridis"] },
+      { key: "grid", label: "显示网格线 (grid)", type: "bool", default: true, sendFalse: true }
+    ],
+    area: [
+      { key: "aggregation", label: "重复 X 值汇总 (aggregation)", type: "select", default: "mean", options: ["mean", "median", "sum"] },
+      { key: "stacked", label: "堆叠面积 (stacked)", type: "bool", default: false },
+      { key: "area_alpha", label: "填充透明度", type: "number", min: 0.05, max: 1, step: 0.05, default: 0.28 },
+      { key: "palette", label: "配色方案 (palette)", type: "select", default: "tab10", options: ["tab10", "Set2", "Dark2", "Paired", "viridis"] },
+      { key: "grid", label: "显示网格线 (grid)", type: "bool", default: true, sendFalse: true }
+    ],
     scatter: [
       { key: "ci", label: "置信区间 (ci)", type: "number", min: 0, max: 1, step: 0.01, default: 0.95 },
       { key: "equal", label: "等比例坐标 (equal)", type: "bool", default: false }
@@ -291,7 +392,7 @@ export function useResearchDrawState() {
   const activeMenu = ref("");
   const menuWrapRef = ref(null);
   const activeSection = ref("data");
-  const mainView = ref("workspace");
+  const mainView = ref("home");
   const contactAssets = ref([]);
   const contactLoading = ref(false);
   const contactError = ref("");
@@ -365,6 +466,14 @@ export function useResearchDrawState() {
   });
 
   const activeDynamicArgDefs = computed(() => DYNAMIC_ARG_DEFS[selectedPlot.value] || []);
+  function plotDisplayName(plotKey) {
+    return plotRegistry.value?.[plotKey]?.display_name || PLOT_DISPLAY_NAMES[plotKey] || plotKey;
+  }
+
+  function plotDescription(plotKey) {
+    return plotRegistry.value?.[plotKey]?.description || "可从内置 Demo 查看此图型的示例。";
+  }
+
   const visibleRenderHistory = computed(() => renderHistory.value.slice(0, historyVisibleCount.value));
   const hasMoreHistory = computed(() => historyVisibleCount.value < renderHistory.value.length);
   const visibleRenderFiles = computed(() => renderFiles.value.slice(0, renderFilesVisibleCount.value));
@@ -382,7 +491,11 @@ export function useResearchDrawState() {
         title: meta[groupKey]?.label || GROUP_META_FALLBACK[groupKey]?.label || groupKey,
         description: meta[groupKey]?.description || GROUP_META_FALLBACK[groupKey]?.description || "科研图型分组",
         scene: meta[groupKey]?.scene || GROUP_META_FALLBACK[groupKey]?.scene || "科研可视化分析",
-        plots
+        plots: plots.map((key) => ({
+          key,
+          label: plotDisplayName(key),
+          description: plotDescription(key)
+        }))
       };
     });
   });
@@ -393,8 +506,10 @@ export function useResearchDrawState() {
     return [
       { label: "图型分组", value: `${groups} 类` },
       { label: "可绘制图型", value: `${totalPlots} 种` },
+      { label: "内置演示", value: `${totalPlots} 种` },
       { label: "数据输入", value: "文件上传 + 表格录入" },
-      { label: "输出格式", value: "PNG / SVG / PDF" }
+      { label: "输出格式", value: "PNG / SVG / PDF" },
+      { label: "开源许可", value: "MIT" }
     ];
   });
 
@@ -410,6 +525,7 @@ export function useResearchDrawState() {
     TOOL_SUBTITLE,
     GROUP_ORDER,
     GROUP_META_FALLBACK,
+    PLOT_DISPLAY_NAMES,
     ABOUT_FEATURES,
     FILE_TYPE_META,
     FIELD_LABELS,
@@ -484,6 +600,8 @@ export function useResearchDrawState() {
     missingRequiredFields,
     visibleMappingFields,
     activeDynamicArgDefs,
+    plotDisplayName,
+    plotDescription,
     visibleRenderHistory,
     hasMoreHistory,
     visibleRenderFiles,

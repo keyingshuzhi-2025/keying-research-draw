@@ -1,0 +1,28 @@
+{
+  "name": "柯影智绘 Atlas",
+  "english": "Atlas",
+  "product": "Research Draw",
+  "brand_version": "1.0",
+  "color": {
+    "navy": "#102A50",
+    "deep_navy": "#071B35",
+    "blue": "#416DE5",
+    "azure": "#2A78F5",
+    "cyan": "#08C4E8",
+    "teal": "#19D7BD",
+    "paper": "#F4F7FB",
+    "text": "#122D4A",
+    "white": "#FFFFFF"
+  },
+  "font_stacks": {
+    "zh": "Noto Sans CJK SC, PingFang SC, Microsoft YaHei, sans-serif",
+    "en": "Inter, Go, Arial, sans-serif"
+  },
+  "minimum_size_px": {
+    "app": 32,
+    "symbol": 32,
+    "horizontal_logo_width": 240
+  },
+  "clear_space": "at least 12.5% of icon height from other elements",
+  "image_source": "AI-generated images preserved, vector mark reconstructed as a separately authored editable interpretation"
+}

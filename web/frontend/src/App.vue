@@ -1,6 +1,8 @@
 <script setup>
-import { computed, nextTick, onMounted, onUnmounted, provide, watch } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, provide, ref, watch } from "vue";
+import AssetManagementPage from "./components/AssetManagementPage.vue";
 import AboutPage from "./components/AboutPage.vue";
+import HomePage from "./components/HomePage.vue";
 import DataInput from "./components/DataInput.vue";
 import ManualPage from "./components/ManualPage.vue";
 import PlotSelector from "./components/PlotSelector.vue";
@@ -8,8 +10,74 @@ import RenderPanel from "./components/RenderPanel.vue";
 import TopBar from "./components/TopBar.vue";
 import { useResearchDrawState } from "./composables/useResearchDrawState";
 import { RESEARCH_DRAW_STORE_KEY } from "./composables/useResearchDrawStore";
+import brandMark from "../../assets/Keying-Atlas-Brand-Kit-v1/05-web-favicon/favicon.svg";
+import { APP_VERSION } from "./version.js";
 
 const state = useResearchDrawState();
+const sidebarCollapsed = ref(false);
+const sidebarWidth = ref(288);
+const settingsOpen = ref(false);
+const settingsPage = ref("basic");
+const modalKind = ref("settings");
+const assetPage = ref("history");
+const SIDEBAR_MIN_WIDTH = 232;
+const SIDEBAR_MAX_WIDTH = 368;
+const SIDEBAR_DEFAULT_WIDTH = 288;
+let sidebarResizeStartX = 0;
+let sidebarResizeStartWidth = SIDEBAR_DEFAULT_WIDTH;
+
+const workflowSections = computed(() => sectionDefs.filter((section) => section.key !== "result"));
+
+function toggleSidebar() {
+  sidebarCollapsed.value = !sidebarCollapsed.value;
+  window.localStorage.setItem("research-draw-sidebar-collapsed", String(sidebarCollapsed.value));
+}
+
+function setSidebarWidth(width) {
+  sidebarWidth.value = Math.max(SIDEBAR_MIN_WIDTH, Math.min(SIDEBAR_MAX_WIDTH, width));
+}
+
+function startSidebarResize(event) {
+  if (event.button !== 0 || sidebarCollapsed.value) return;
+  event.preventDefault();
+  sidebarResizeStartX = event.clientX;
+  sidebarResizeStartWidth = sidebarWidth.value;
+  document.body.classList.add("sidebar-resizing");
+  window.addEventListener("pointermove", moveSidebarResize);
+  window.addEventListener("pointerup", stopSidebarResize, { once: true });
+  window.addEventListener("pointercancel", stopSidebarResize, { once: true });
+}
+
+function moveSidebarResize(event) {
+  setSidebarWidth(sidebarResizeStartWidth + event.clientX - sidebarResizeStartX);
+}
+
+function stopSidebarResize() {
+  window.removeEventListener("pointermove", moveSidebarResize);
+  window.removeEventListener("pointerup", stopSidebarResize);
+  window.removeEventListener("pointercancel", stopSidebarResize);
+  document.body.classList.remove("sidebar-resizing");
+  window.localStorage.setItem("research-draw-sidebar-width", String(sidebarWidth.value));
+}
+
+function handleSidebarResizeKeydown(event) {
+  if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+    event.preventDefault();
+    setSidebarWidth(sidebarWidth.value + (event.key === "ArrowRight" ? 12 : -12));
+  } else if (event.key === "Home") {
+    event.preventDefault();
+    setSidebarWidth(SIDEBAR_MIN_WIDTH);
+  } else if (event.key === "End") {
+    event.preventDefault();
+    setSidebarWidth(SIDEBAR_MAX_WIDTH);
+  }
+  window.localStorage.setItem("research-draw-sidebar-width", String(sidebarWidth.value));
+}
+
+function resetSidebarWidth() {
+  setSidebarWidth(SIDEBAR_DEFAULT_WIDTH);
+  window.localStorage.setItem("research-draw-sidebar-width", String(sidebarWidth.value));
+}
 
 const {
   TOOL_NAME,
@@ -30,6 +98,7 @@ const {
   healthText,
   plotsByGroup,
   plotRegistry,
+  plotDisplayName,
   groupMeta,
   selectedGroup,
   selectedPlot,
@@ -97,6 +166,9 @@ const {
 } = state;
 
 let renderProgressTimer = null;
+const settingsActionLoading = ref("");
+const settingsActionMessage = ref("");
+const settingsActionTone = ref("info");
 
 function escapeHtml(raw) {
   return String(raw ?? "")
@@ -149,6 +221,7 @@ function markdownToHtml(markdownText) {
   let codeLang = "";
   let codeLines = [];
   let inQuote = false;
+  let manualHeadingIndex = 0;
 
   const flushParagraph = () => {
     if (!paragraph.length) return;
@@ -235,7 +308,9 @@ function markdownToHtml(markdownText) {
       flushParagraph();
       closeList();
       const level = headingMatch[1].length;
-      html.push(`<h${level}>${parseInlineMarkdown(headingMatch[2].trim())}</h${level}>`);
+      const id = `manual-heading-${manualHeadingIndex}`;
+      manualHeadingIndex += 1;
+      html.push(`<h${level} id="${id}">${parseInlineMarkdown(headingMatch[2].trim())}</h${level}>`);
       continue;
     }
 
@@ -276,6 +351,31 @@ function markdownToHtml(markdownText) {
 }
 
 const manualHtml = computed(() => markdownToHtml(manualText.value));
+const manualHeadings = computed(() => {
+  const headings = [];
+  let inCode = false;
+  let headingIndex = 0;
+  for (const line of String(manualText.value || "").replace(/\r\n?/g, "\n").split("\n")) {
+    const trimmed = line.trim();
+    if (/^```/.test(trimmed)) {
+      inCode = !inCode;
+      continue;
+    }
+    if (inCode) continue;
+    const match = trimmed.match(/^(#{1,6})\s+(.+)$/);
+    if (!match) continue;
+    const index = headingIndex;
+    headingIndex += 1;
+    if (match[1].length <= 3) {
+      headings.push({
+        id: `manual-heading-${index}`,
+        level: match[1].length,
+        title: match[2].trim().replace(/[\`*_]/g, "")
+      });
+    }
+  }
+  return headings;
+});
 
 function normalizeApiBase() {
   return apiBase.value.replace(/\/+$/, "");
@@ -295,8 +395,36 @@ function closeMenu() {
 }
 
 function openMainView(view) {
-  mainView.value = view;
-  closeMenu();
+  if (view === "workspace" || view === "home") {
+    mainView.value = view;
+    settingsOpen.value = false;
+    closeMenu();
+    return;
+  }
+  openSettingsPage(view);
+}
+
+function openSettingsPage(page) {
+  modalKind.value = "settings";
+  settingsPage.value = ["basic", "about", "manual"].includes(page) ? page : "basic";
+  settingsOpen.value = true;
+  if (settingsPage.value === "about") void fetchContactAssets();
+  if (settingsPage.value === "manual") void fetchUserManual();
+}
+
+function openAssetPage(page = "history") {
+  modalKind.value = "assets";
+  assetPage.value = ["history", "files"].includes(page) ? page : "history";
+  settingsOpen.value = true;
+  if (assetPage.value === "files") void fetchRenderFiles();
+}
+
+function closeSettings() {
+  settingsOpen.value = false;
+}
+
+function onSettingsKeydown(event) {
+  if (event.key === "Escape") closeSettings();
 }
 
 function onDocClick(event) {
@@ -323,7 +451,6 @@ function prettifyContactName(name) {
   const known = {
     小红书: "小红书",
     微信公众号: "微信公众号",
-    微信服务号: "微信服务号",
     粉丝群: "粉丝群"
   };
   return known[key] || key.replace(/[_-]+/g, " ");
@@ -381,6 +508,7 @@ async function fetchHealth() {
   } catch {
     healthStatus.value = "down";
   }
+  return healthStatus.value === "ok";
 }
 
 async function fetchPlotRegistry() {
@@ -407,11 +535,13 @@ async function fetchPlotRegistry() {
       groupMeta.value = nextMeta;
     }
     applyRegistryDefaultsToDynamicArgs();
+    return true;
   } catch (e) {
     // graceful fallback: keep local fallback metadata
     plotRegistry.value = {};
     groupMeta.value = { ...GROUP_META_FALLBACK };
     console.warn(e);
+    return false;
   }
 }
 
@@ -426,8 +556,44 @@ async function fetchPlots() {
       selectedGroup.value = groups[0];
       selectedPlot.value = (plotsByGroup.value[selectedGroup.value] || [])[0] || "box";
     }
+    return true;
   } catch (e) {
     messageErr.value = String(e);
+    return false;
+  }
+}
+
+async function checkSettingsConnection() {
+  settingsActionLoading.value = "health";
+  settingsActionTone.value = "loading";
+  settingsActionMessage.value = "正在检查后端连接…";
+  try {
+    const connected = await fetchHealth();
+    settingsActionTone.value = connected ? "success" : "error";
+    settingsActionMessage.value = connected
+      ? `连接成功：${apiBase.value}`
+      : `连接失败：无法访问 ${apiBase.value}，请检查服务地址和后端状态。`;
+  } finally {
+    settingsActionLoading.value = "";
+  }
+}
+
+async function refreshSettingsPlotCatalog() {
+  settingsActionLoading.value = "plots";
+  settingsActionTone.value = "loading";
+  settingsActionMessage.value = "正在同步图型目录…";
+  try {
+    const [registryOk, plotsOk] = await Promise.all([fetchPlotRegistry(), fetchPlots()]);
+    const groups = Object.values(plotsByGroup.value || {});
+    const plotCount = groups.reduce((total, group) => total + (Array.isArray(group) ? group.length : 0), 0);
+    const groupCount = groups.filter((group) => Array.isArray(group) && group.length).length;
+    const refreshed = registryOk && plotsOk;
+    settingsActionTone.value = refreshed ? "success" : "error";
+    settingsActionMessage.value = refreshed
+      ? `图型目录已更新：${groupCount} 个分类，${plotCount} 种图型。`
+      : "图型目录刷新失败，请检查后端连接后重试。";
+  } finally {
+    settingsActionLoading.value = "";
   }
 }
 
@@ -489,7 +655,7 @@ function collectDynamicArgs() {
   for (const def of activeDynamicArgDefs.value) {
     const val = dynamicArgs[def.key];
     if (def.type === "bool") {
-      if (Boolean(val)) out[def.key] = true;
+      if (def.sendFalse || Boolean(val)) out[def.key] = Boolean(val);
       continue;
     }
     if (val === "" || val === null || typeof val === "undefined") continue;
@@ -1119,16 +1285,34 @@ function parseExtraArgs() {
 
 function buildRenderArgs() {
   const args = {};
-  for (const [k, v] of Object.entries(mappings)) {
-    const val = String(v || "").trim();
-    if (val) args[k] = val;
+  if (renderMode.value !== "demo") {
+    for (const [k, v] of Object.entries(mappings)) {
+      const val = String(v || "").trim();
+      if (val) args[k] = val;
+    }
   }
   Object.assign(args, collectDynamicArgs());
   if (figure.xlabel.trim()) args.xlabel = figure.xlabel.trim();
   if (figure.ylabel.trim()) args.ylabel = figure.ylabel.trim();
   if (figure.zlabel.trim()) args.zlabel = figure.zlabel.trim();
-  Object.assign(args, parseExtraArgs());
+  if (renderMode.value !== "demo") Object.assign(args, parseExtraArgs());
   return args;
+}
+
+async function renderDemoForPlot(plotKey) {
+  const matchingGroup = Object.entries(plotsByGroup.value || {}).find(([, plots]) => plots.includes(plotKey));
+  if (!matchingGroup) {
+    messageErr.value = `未找到图型“${plotKey}”所属分组，请刷新图型目录后重试。`;
+    return;
+  }
+  selectedGroup.value = matchingGroup[0];
+  selectedPlot.value = plotKey;
+  renderMode.value = "demo";
+  figure.title = `${plotDisplayName(plotKey)}示例`;
+  mainView.value = "workspace";
+  activeSection.value = "plot";
+  await nextTick();
+  await renderImage();
 }
 
 function sanitizeRetryPayload(retryPayload) {
@@ -1280,6 +1464,7 @@ async function renderImage(retryPayload = null) {
 const appStore = {
   ...state,
   manualHtml,
+  manualHeadings,
   escapeHtml,
   escapeAttr,
   parseInlineMarkdown,
@@ -1353,6 +1538,7 @@ const appStore = {
   tableToCsv,
   uploadTableDataset,
   chooseGroup,
+  renderDemoForPlot,
   resetResult,
   loadMoreHistory,
   loadMoreRenderFiles,
@@ -1410,7 +1596,22 @@ watch(
   }
 );
 
+watch(settingsOpen, (isOpen) => {
+  document.body.classList.toggle("modal-open", isOpen);
+  if (isOpen) {
+    document.addEventListener("keydown", onSettingsKeydown);
+  } else {
+    document.removeEventListener("keydown", onSettingsKeydown);
+  }
+});
+
 onMounted(async () => {
+  const savedSidebarState = window.localStorage.getItem("research-draw-sidebar-collapsed");
+  const savedSidebarWidth = Number(window.localStorage.getItem("research-draw-sidebar-width"));
+  if (Number.isFinite(savedSidebarWidth) && savedSidebarWidth > 0) setSidebarWidth(savedSidebarWidth);
+  sidebarCollapsed.value = savedSidebarState === null
+    ? window.matchMedia("(max-width: 900px)").matches
+    : savedSidebarState === "true";
   document.addEventListener("click", onDocClick);
   loadRenderHistory();
   await fetchHealth();
@@ -1421,7 +1622,10 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  stopSidebarResize();
   document.removeEventListener("click", onDocClick);
+  document.removeEventListener("keydown", onSettingsKeydown);
+  document.body.classList.remove("modal-open");
   if (renderProgressTimer) {
     clearInterval(renderProgressTimer);
     renderProgressTimer = null;
@@ -1430,113 +1634,266 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="app-shell">
-    <TopBar />
-
-    <div class="main-layout">
-      <aside class="sidebar panel">
-        <div class="side-head">
-          <h3>{{ mainView === "workspace" ? "流程导航" : "页面导航" }}</h3>
-          <span :class="['health-pill', healthStatus]">{{ healthText }}</span>
+  <div
+    :class="['app-shell', { 'nav-collapsed': sidebarCollapsed }]"
+    :style="{ '--sidebar-width': `${sidebarWidth}px` }"
+  >
+    <aside :class="['sidebar panel', { collapsed: sidebarCollapsed }]">
+      <div class="sidebar-brand">
+        <button
+          v-if="sidebarCollapsed"
+          class="brand-logo-wrap brand-expand-trigger"
+          type="button"
+          aria-label="展开侧边导航"
+          aria-expanded="false"
+          @click="toggleSidebar"
+        >
+          <img class="brand-mark" :src="brandMark" alt="" />
+          <span class="brand-expand-indicator" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <rect x="3.5" y="4" width="17" height="16" rx="2.5" />
+              <path d="M9 4v16m4-7 3-3-3-3" />
+            </svg>
+          </span>
+        </button>
+        <div v-else class="brand-logo-wrap">
+          <img class="brand-mark" :src="brandMark" alt="柯影智绘 Atlas" />
         </div>
+        <div v-if="!sidebarCollapsed" class="brand-copy">
+          <div class="brand-heading">
+            <div class="brand-title">{{ TOOL_NAME }}</div>
+            <span class="brand-version">{{ APP_VERSION }}</span>
+          </div>
+          <div class="brand-sub">{{ TOOL_SUBTITLE || "科研绘图工作台" }}</div>
+        </div>
+        <button
+          v-if="!sidebarCollapsed"
+          class="nav-collapse-btn"
+          aria-label="折叠侧边导航"
+          aria-expanded="true"
+          @click="toggleSidebar"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="3.5" y="4" width="17" height="16" rx="2.5" />
+            <path d="M9 4v16" />
+            <path d="m16 9-3 3 3 3" />
+          </svg>
+        </button>
+      </div>
 
-        <div v-if="mainView === 'workspace'" class="side-nav-list">
+      <nav class="side-nav-list primary-side-nav" aria-label="主导航">
+        <button
+          class="side-nav-btn"
+          :class="{ active: mainView === 'home' }"
+          :data-tooltip="sidebarCollapsed ? '首页' : null"
+          aria-label="首页"
+          @click="openMainView('home')"
+        >
+          <span class="side-nav-main">
+            <span class="side-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="m3 10 9-7 9 7"/><path d="M5.5 9v11h13V9M9 20v-6h6v6"/></svg>
+            </span>
+            <span v-if="!sidebarCollapsed">首页</span>
+          </span>
+        </button>
+      </nav>
+
+      <div v-if="mainView === 'workspace'" class="workflow-nav">
+        <span v-if="!sidebarCollapsed" class="nav-group-label">绘图流程</span>
+        <nav class="side-nav-list" aria-label="绘图流程导航">
           <button
-            v-for="section in sectionDefs"
+            v-for="section in workflowSections"
             :key="section.id"
             class="side-nav-btn"
             :class="{ active: activeSection === section.key }"
+            :data-tooltip="sidebarCollapsed ? section.title : null"
+            :aria-label="section.title"
             @click="scrollToSection(section.id, section.key)"
           >
             <span class="side-nav-main">
-              <span class="side-icon">{{ section.icon }}</span>
-              <span>{{ section.title }}</span>
+              <span class="side-icon" aria-hidden="true">
+                <svg v-if="section.key === 'data'" viewBox="0 0 24 24"><path d="M6 3.5h8l4 4V20H6z"/><path d="M14 3.5V8h4M9 12h6M9 15h6"/></svg>
+                <svg v-else-if="section.key === 'plot'" viewBox="0 0 24 24"><path d="M4 20V4M4 20h17"/><path d="M8 16v-4M12 16V8M16 16V5M20 16v-7"/></svg>
+                <svg v-else-if="section.key === 'figure'" viewBox="0 0 24 24"><path d="M5 5v14M12 5v14M19 5v14"/><path d="M3 9h4M10 15h4M17 8h4"/></svg>
+              </span>
+              <span v-if="!sidebarCollapsed">{{ section.title }}</span>
             </span>
             <span :class="['status-dot', sectionStatus[section.key] === 'ready' ? 'ready' : 'pending']"></span>
           </button>
-        </div>
-        <div v-else class="side-nav-list">
-          <button class="side-nav-btn" :class="{ active: mainView === 'workspace' }" @click="openMainView('workspace')">
-            <span class="side-nav-main">
-              <span class="side-icon">W</span>
-              <span>工作区</span>
-            </span>
-          </button>
-          <button class="side-nav-btn" :class="{ active: mainView === 'about' }" @click="openMainView('about')">
-            <span class="side-nav-main">
-              <span class="side-icon">A</span>
-              <span>关于页面</span>
-            </span>
-          </button>
-          <button class="side-nav-btn" :class="{ active: mainView === 'manual' }" @click="openMainView('manual')">
-            <span class="side-nav-main">
-              <span class="side-icon">M</span>
-              <span>用户手册</span>
-            </span>
-          </button>
-        </div>
+        </nav>
+      </div>
 
-        <div class="server-advanced-card">
-          <details class="advanced-panel">
-            <summary>后端连接（高级设置）</summary>
-            <div class="advanced-body">
-              <label>
+      <div class="sidebar-footer">
+        <button
+          class="side-nav-btn"
+          :data-tooltip="sidebarCollapsed ? '资产管理' : null"
+          aria-label="资产管理"
+          @click="openAssetPage('history')"
+        >
+          <span class="side-nav-main">
+            <span class="side-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M4 7.5h6l2 2h8v9.5H4z"/><path d="M4 7.5V5h6l2 2"/></svg>
+            </span>
+            <span v-if="!sidebarCollapsed">资产管理</span>
+          </span>
+        </button>
+        <button
+          class="side-nav-btn settings-entry"
+          :data-tooltip="sidebarCollapsed ? '设置' : null"
+          aria-label="设置"
+          @click="openSettingsPage('basic')"
+        >
+          <span class="side-nav-main">
+            <span class="side-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Z"/><path d="M19 12a7 7 0 0 0-.1-1.2l1.2-.9-1.4-2.3-1.4.6a7 7 0 0 0-2-.9L15 5.8h-2.8l-.3 1.5a7 7 0 0 0-2 .9l-1.4-.6-1.4 2.3 1.2.9a7 7 0 0 0 0 2.4l-1.2.9 1.4 2.3 1.4-.6a7 7 0 0 0 2 .9l.3 1.5H15l.3-1.5a7 7 0 0 0 2-.9l1.4.6 1.4-2.3-1.2-.9A7 7 0 0 0 19 12Z"/></svg>
+            </span>
+            <span v-if="!sidebarCollapsed">设置</span>
+          </span>
+        </button>
+      </div>
+      <button
+        v-if="!sidebarCollapsed"
+        class="sidebar-resize-handle"
+        type="button"
+        role="separator"
+        aria-label="调整导航栏宽度"
+        aria-orientation="vertical"
+        :aria-valuemin="SIDEBAR_MIN_WIDTH"
+        :aria-valuemax="SIDEBAR_MAX_WIDTH"
+        :aria-valuenow="sidebarWidth"
+        @pointerdown="startSidebarResize"
+        @keydown="handleSidebarResizeKeydown"
+        @dblclick="resetSidebarWidth"
+      ></button>
+    </aside>
+
+    <div class="app-main">
+      <TopBar />
+      <div class="main-layout">
+        <main v-if="mainView === 'workspace'" class="workspace">
+          <div class="workspace-columns">
+            <div class="workflow-column" aria-label="绘图步骤一至三">
+              <section class="workspace-intro">
+                <div class="workspace-intro-copy">
+                  <span class="page-eyebrow">RESEARCH DRAW · SCIENTIFIC FIGURE STUDIO</span>
+                  <h1>让科研数据，清晰地表达</h1>
+                  <p>导入数据或从示例开始，选择合适图型、调整样式并导出结果。</p>
+                </div>
+              </section>
+              <DataInput />
+              <PlotSelector />
+            </div>
+            <section class="render-column" aria-label="渲染与预览">
+              <RenderPanel />
+            </section>
+          </div>
+        </main>
+        <main v-else class="home-main">
+          <HomePage
+            @open-workspace="openMainView('workspace')"
+            @open-manual="openSettingsPage('manual')"
+          />
+        </main>
+      </div>
+      </div>
+
+    <div
+      v-if="settingsOpen"
+      class="settings-overlay"
+      @click.self="closeSettings"
+    >
+      <section
+        :class="['settings-modal', { 'assets-modal': modalKind === 'assets', 'manual-settings-modal': modalKind === 'settings' && settingsPage === 'manual' }]"
+        role="dialog"
+        aria-modal="true"
+        :aria-labelledby="modalKind === 'settings' ? 'settings-title' : 'assets-title'"
+      >
+        <header class="settings-modal-header">
+          <div class="settings-modal-heading">
+            <span class="settings-modal-mark" aria-hidden="true">
+              <svg v-if="modalKind === 'settings'" viewBox="0 0 24 24"><path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Z"/><path d="M19 12a7 7 0 0 0-.1-1.2l1.2-.9-1.4-2.3-1.4.6a7 7 0 0 0-2-.9L15 5.8h-2.8l-.3 1.5a7 7 0 0 0-2 .9l-1.4-.6-1.4 2.3 1.2.9a7 7 0 0 0 0 2.4l-1.2.9 1.4 2.3 1.4-.6a7 7 0 0 0 2 .9l.3 1.5H15l.3-1.5a7 7 0 0 0 2-.9l1.4.6 1.4-2.3-1.2-.9A7 7 0 0 0 19 12Z"/></svg>
+              <svg v-else viewBox="0 0 24 24"><path d="M4 7.5h6l2 2h8v9.5H4z"/><path d="M4 7.5V5h6l2 2"/></svg>
+            </span>
+            <div>
+              <span>{{ modalKind === "settings" ? "偏好与项目信息" : "渲染产物与记录" }}</span>
+              <h2 v-if="modalKind === 'settings'" id="settings-title">设置</h2>
+              <h2 v-else id="assets-title">资产管理</h2>
+            </div>
+          </div>
+          <button class="settings-close" aria-label="关闭弹窗" @click="closeSettings">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+          </button>
+        </header>
+
+        <div class="settings-modal-layout">
+          <nav v-if="modalKind === 'settings'" class="settings-subnav" aria-label="设置页面">
+            <span class="settings-nav-label">设置页面</span>
+            <button :class="{ active: settingsPage === 'basic' }" @click="openSettingsPage('basic')">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="9" cy="6" r="2"/><circle cx="15" cy="12" r="2"/><circle cx="8" cy="18" r="2"/></svg>
+              <span>基础设置</span>
+            </button>
+            <button :class="{ active: settingsPage === 'about' }" @click="openSettingsPage('about')">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5M12 8h.01"/></svg>
+              <span>关于</span>
+            </button>
+            <button :class="{ active: settingsPage === 'manual' }" @click="openSettingsPage('manual')">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21z"/><path d="M4 5.5v13A2.5 2.5 0 0 1 6.5 16H20M8 7h8M8 10h8"/></svg>
+              <span>用户手册</span>
+            </button>
+          </nav>
+          <nav v-else class="settings-subnav" aria-label="资产管理页面">
+            <span class="settings-nav-label">资产类别</span>
+            <button :class="{ active: assetPage === 'history' }" @click="openAssetPage('history')">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3.5 2"/></svg>
+              <span>渲染历史</span>
+            </button>
+            <button :class="{ active: assetPage === 'files' }" @click="openAssetPage('files')">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4" width="17" height="16" rx="2"/><circle cx="9" cy="10" r="1.5"/><path d="m5 18 5-5 3 3 2-2 4 4"/></svg>
+              <span>渲染文件</span>
+            </button>
+          </nav>
+
+          <div class="settings-page-scroll">
+            <section v-if="modalKind === 'settings' && settingsPage === 'basic'" class="settings-basic-page">
+              <div class="settings-page-heading">
+                <span class="section-kicker">基础设置</span>
+                <h3>后端连接</h3>
+                <p>默认使用本机服务地址；仅在部署环境变化时需要调整。</p>
+              </div>
+              <label class="settings-api-field">
                 服务地址
                 <input v-model="apiBase" placeholder="http://127.0.0.1:8000" />
               </label>
-              <div class="btn-row">
-                <button class="ghost" @click="fetchHealth">检查连接</button>
-                <button class="ghost" @click="fetchPlotRegistry(); fetchPlots()">刷新图型</button>
+              <div class="settings-api-actions">
+                <button class="ghost" :disabled="settingsActionLoading !== ''" @click="checkSettingsConnection">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12a7 7 0 0 1 12-4.9L19 9"/><path d="M19 5v4h-4M19 12a7 7 0 0 1-12 4.9L5 15"/><path d="M5 19v-4h4"/></svg>
+                  {{ settingsActionLoading === "health" ? "检查中…" : "检查连接" }}
+                </button>
+                <button class="ghost" :disabled="settingsActionLoading !== ''" @click="refreshSettingsPlotCatalog">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19.5h16M6 16V9M10 16V5M14 16v-4M18 16V7"/></svg>
+                  {{ settingsActionLoading === "plots" ? "同步中…" : "刷新图型目录" }}
+                </button>
               </div>
-            </div>
-          </details>
-          <p class="muted">默认用户无需调整。仅在后端地址或部署环境变更时使用。</p>
+              <p
+                v-if="settingsActionMessage"
+                :class="['settings-action-feedback', settingsActionTone]"
+                role="status"
+                aria-live="polite"
+              >
+                <span class="settings-feedback-icon" aria-hidden="true">
+                  <svg v-if="settingsActionTone === 'success'" viewBox="0 0 24 24"><path d="m5 12 4.5 4.5L19 7"/></svg>
+                  <svg v-else-if="settingsActionTone === 'loading'" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v5h-5"/></svg>
+                  <svg v-else viewBox="0 0 24 24"><path d="M12 8v5M12 17h.01"/><circle cx="12" cy="12" r="9"/></svg>
+                </span>
+                {{ settingsActionMessage }}
+              </p>
+            </section>
+            <AboutPage v-else-if="modalKind === 'settings' && settingsPage === 'about'" />
+            <ManualPage v-else-if="modalKind === 'settings' && settingsPage === 'manual'" />
+            <AssetManagementPage v-else :page="assetPage" />
+          </div>
         </div>
-      </aside>
-
-      <main :class="['workspace', { 'single-view': mainView !== 'workspace' }]">
-        <template v-if="mainView === 'workspace'">
-          <DataInput />
-          <PlotSelector />
-
-          <section id="section-figure" class="panel section-card">
-            <div class="section-head">
-              <h2>图形设置（独立于数据）</h2>
-            </div>
-            <div class="mapping-grid">
-              <label>
-                图标题 (title)
-                <input v-model="figure.title" placeholder="例如：样本三维结构分析" />
-              </label>
-              <label>
-                X 轴标题 (xlabel)
-                <input v-model="figure.xlabel" placeholder="例如：Temperature (°C)" />
-              </label>
-              <label>
-                Y 轴标题 (ylabel)
-                <input v-model="figure.ylabel" placeholder="例如：Intensity" />
-              </label>
-              <label>
-                Z 轴标题 (zlabel)
-                <input v-model="figure.zlabel" placeholder="例如：Depth" />
-              </label>
-            </div>
-          </section>
-
-          <RenderPanel />
-        </template>
-
-        <AboutPage v-else-if="mainView === 'about'" />
-        <ManualPage v-else />
-      </main>
+      </section>
     </div>
-
-    <footer class="app-footer">
-      <div class="footer-inner">
-        <span>开发团队：柯影数智团队</span>
-        <span>ICP备案号：待填写（占位）</span>
-        <span>公网安备号：待填写（占位）</span>
-      </div>
-    </footer>
   </div>
 </template>
