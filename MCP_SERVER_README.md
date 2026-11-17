@@ -2,7 +2,9 @@
 
 This is an MCP (Model Context Protocol) server for the Research Draw scientific visualization toolkit.
 
-当前开发版本：`v0.1.5`（尚未发布）。MCP 工具、工作区隔离和分块上传均以本版本实现为准。
+当前 MCP 代码版本：`v0.1.5`。本机 stdio、本机 Docker 和阿里云 ECS（Alibaba Cloud Linux 3）部署步骤见[部署教程](MCP_DEPLOYMENT_GUIDE.md)。
+
+当前已发布的 v0.1.5 `linux/amd64` 镜像：`ghcr.io/keyingshuzhi-2025/keying-research-draw-mcp:v0.1.5`。
 
 ## Overview
 
@@ -24,7 +26,7 @@ uv sync --extra all
 
 ### As a standalone MCP server
 
-本地运行前，需要配置独立于项目目录的工作区。服务会在逻辑工作区内按 MCP 会话创建隐藏的隔离目录，数据副本、待上传分块和绘图结果分别放入会话目录下的 `inputs/mcp/`、`.mcp-upload-staging/` 和 `outputs/mcp/`。
+本机进程（stdio）部署的完整步骤见[部署教程](MCP_DEPLOYMENT_GUIDE.md)。本地运行前，需要配置独立于项目目录的工作区。服务会在逻辑工作区内按 MCP 会话创建隐藏的隔离目录，数据副本、待上传分块和绘图结果分别放入会话目录下的 `inputs/mcp/`、`.mcp-upload-staging/` 和 `outputs/mcp/`。
 
 ### 柯影智航 MCP 服务注册指南
 
@@ -45,13 +47,13 @@ uv sync --extra all
      ```text
      run
      --project
-     /Volumes/柯影数智/研发部/项目/keying-research-draw
+     /path/to/keying-research-draw
      --extra
      mcp
      research-draw-mcp
      ```
 
-   - 工作目录：`/Volumes/柯影数智/研发部/项目/keying-research-draw`
+   - 工作目录：项目根目录绝对路径，例如 `/path/to/keying-research-draw`
 
    工作目录请填写柯影智航本机安装的项目根目录绝对路径。
 
@@ -94,7 +96,9 @@ RESEARCH_DRAW_MCP_WORKSPACES='{"research":"/Volumes/柯影数智/研发部/实�
 
 This will start the MCP server using stdio transport, ready to accept connections from MCP clients.
 
-### 远程 Docker 部署（amd64）
+### Docker 镜像部署参考（amd64）
+
+本机 Docker 和阿里云 ECS 的逐步部署教程见[部署教程](MCP_DEPLOYMENT_GUIDE.md)。
 
 仓库提供只包含 MCP 服务的 Linux `amd64` 镜像，不打包 Web 前端。镜像基于 Python 3.13.15，保留绘图源码和只读离线地图/示例数据；容器以非 root 用户运行。容器只 bind mount `RESEARCH_DRAW_MCP_HOST_WORKSPACES_ROOT` 指定的共同宿主机目录到 `/host-workspaces`，不把数据持久化在容器层或 Docker volume 中。Compose 将逻辑工作区 allowlist 和默认工作区注入容器；所有映射路径仍限制在共同根目录之内。`.env` 运行配置及令牌文件均不进入镜像，运行配置由 Compose 注入，令牌由 Docker Secret 提供。`.dockerignore` 会排除 `.env*`、输出目录和本地密钥文件，Dockerfile 只复制明确列出的源码、依赖清单和静态数据目录。
 
@@ -106,15 +110,18 @@ HTTP MCP 的调用方可省略工作区参数并使用默认逻辑工作区，�
 
 服务通过 Streamable HTTP 提供于 `/mcp`。柯影智航连接例如 `https://mcp.example.com/mcp`，并设置请求头 `Authorization: Bearer <团队签发的令牌>`。团队管理员负责核实接入团队、签发和轮换令牌；团队共用令牌标识团队级访问，不能区分具体成员。
 
-推送与根目录 `VERSION` 相符的稳定版本 tag（例如 `v0.1.5`）会自动构建 `linux/amd64` 镜像并发布到 GHCR。发布完成后，镜像地址为 `ghcr.io/keyingshuzhi/keying-research-draw-mcp`，并使用 `vX.Y.Z`、`X.Y.Z` 和 `latest` 标签。管理员可从 Actions 手动重试：必须把 workflow ref 选为已存在的目标 release tag，并在输入框填写同一个 tag；workflow 会拒绝从分支或其他 tag 构建，以确保代码来源与镜像版本一致。workflow 使用 `GITHUB_TOKEN` 发布并关联源仓库；GitHub 说明由工作流创建的 package 会继承该仓库的可见性和权限模型。当前源仓库为公开仓库，因此镜像预期可匿名拉取；package 可见性仍可单独管理，首次发布后可在 GitHub Packages 页面确认。详见 [GitHub Actions package 权限说明](https://docs.github.com/en/packages/managing-github-packages-using-github-actions-workflows/publishing-and-installing-a-package-with-github-actions)和 [GHCR 可见性说明](https://docs.github.com/en/packages/learn-github-packages/configuring-a-packages-access-control-and-visibility)。workflow 不使用仓库中的环境配置或密钥作为 build input。
+当前 v0.1.5 镜像已发布在 `ghcr.io/keyingshuzhi-2025/keying-research-draw-mcp`。本仓库的发布工作流按当前仓库 owner 生成后续镜像名（当前为 `ghcr.io/keyingshuzhi/keying-research-draw-mcp`）；部署新版本时，以该版本实际发布的 GHCR 地址更新 `.env`。
+
+推送与根目录 `VERSION` 相符的稳定版本 tag 会自动构建 `linux/amd64` 镜像并发布到 GHCR，使用 `vX.Y.Z`、`X.Y.Z` 和 `latest` 标签。管理员可从 Actions 手动重试：必须把 workflow ref 选为已存在的目标 release tag，并在输入框填写同一个 tag；workflow 会拒绝从分支或其他 tag 构建，以确保代码来源与镜像版本一致。workflow 使用 `GITHUB_TOKEN` 发布并关联源仓库；GitHub 说明由工作流创建的 package 会继承该仓库的可见性和权限模型。详见 [GitHub Actions package 权限说明](https://docs.github.com/en/packages/managing-github-packages-using-github-actions-workflows/publishing-and-installing-a-package-with-github-actions)和 [GHCR 可见性说明](https://docs.github.com/en/packages/learn-github-packages/configuring-a-packages-access-control-and-visibility)。workflow 不使用仓库中的环境配置或密钥作为 build input。
 
 建议在仓库 Rulesets 中限制 `v*` release tag 的创建和更新权限，只允许发布管理员操作；workflow 本身会拒绝非稳定版本号以及与 `VERSION` 不一致的 tag。
 
-正式发布并确认版本号后，推送 tag 的示例（这会触发 GHCR 镜像构建）：
+将根目录 `VERSION` 更新到目标版本并准备好发布提交后，推送同名 tag 会触发 GHCR 镜像构建：
 
 ```bash
-git tag v0.1.5
-git push origin v0.1.5
+VERSION_TAG="$(tr -d '[:space:]' < VERSION)"
+git tag "$VERSION_TAG"
+git push origin "$VERSION_TAG"
 ```
 
 在部署服务器上创建令牌文件，令牌至少 32 个可见 ASCII 字符：

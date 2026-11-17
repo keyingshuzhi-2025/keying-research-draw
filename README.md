@@ -7,7 +7,7 @@ Research Draw 是一个面向科研场景的可视化工具站，提供从数据
 - Python CLI（`uv run python -m src.main` / `uv run research-draw`）
 - Web 端（FastAPI + Vue3）
 
-> 当前开发版本：`v0.1.5`（尚未发布）
+> 当前开发版本：`v0.1.5`（项目整体尚未发行；MCP v0.1.5 Docker 镜像已单独发布，部署方式见 [MCP_DEPLOYMENT_GUIDE.md](MCP_DEPLOYMENT_GUIDE.md)）。
 
 项目环境已统一使用 `uv` 管理，Python 版本固定为 `3.13.15`。依赖声明以 `pyproject.toml` 为准，解析结果锁定在 `uv.lock`。
 
@@ -108,7 +108,7 @@ research-draw --help
 
 ## MCP Server
 
-MCP 服务提供图型发现、数据分析与推荐、参数校验、数据导入、绘图和结果管理。当前开发版本为 `v0.1.5`，尚未发布。工作区由服务端配置为逻辑名称，工具调用可省略工作区参数使用默认值，也可传逻辑名称：
+MCP 服务提供图型发现、数据分析与推荐、参数校验、数据导入、绘图和结果管理。当前 MCP 代码版本为 `v0.1.5`；已发布的 Docker 镜像为 `ghcr.io/keyingshuzhi-2025/keying-research-draw-mcp:v0.1.5`。本机 stdio、本机 Docker 和阿里云 ECS（Alibaba Cloud Linux 3）部署教程见 [MCP_DEPLOYMENT_GUIDE.md](MCP_DEPLOYMENT_GUIDE.md)。工作区由服务端配置为逻辑名称，工具调用可省略工作区参数使用默认值，也可传逻辑名称：
 
 ```bash
 uv sync --extra mcp
