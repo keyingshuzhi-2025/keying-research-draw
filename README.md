@@ -7,7 +7,7 @@ Research Draw 是一个面向科研场景的可视化工具站，提供从数据
 - Python CLI（`uv run python -m src.main` / `uv run research-draw`）
 - Web 端（FastAPI + Vue3）
 
-> 当前开发版本：`v0.1.5`（项目整体尚未发行；MCP v0.1.5 Docker 镜像已单独发布，部署方式见 [MCP_DEPLOYMENT_GUIDE.md](MCP_DEPLOYMENT_GUIDE.md)）。
+> 当前开发版本：`v0.1.5`（项目整体尚未发行；MCP v0.1.5 Docker 镜像已单独发布，部署方式见内部资料 `.internal-docs/MCP_DEPLOYMENT_GUIDE.md`）。
 
 项目环境已统一使用 `uv` 管理，Python 版本固定为 `3.13.15`。依赖声明以 `pyproject.toml` 为准，解析结果锁定在 `uv.lock`。
 
@@ -108,7 +108,7 @@ research-draw --help
 
 ## MCP Server
 
-MCP 服务提供图型发现、数据分析与推荐、参数校验、数据导入、绘图和结果管理。当前 MCP 代码版本为 `v0.1.5`；已发布的 Docker 镜像为 `ghcr.io/keyingshuzhi-2025/keying-research-draw-mcp:v0.1.5`。本机 stdio、本机 Docker 和阿里云 ECS（Alibaba Cloud Linux 3）部署教程见 [MCP_DEPLOYMENT_GUIDE.md](MCP_DEPLOYMENT_GUIDE.md)。工作区由服务端配置为逻辑名称，工具调用可省略工作区参数使用默认值，也可传逻辑名称：
+MCP 服务提供图型发现、数据分析与推荐、参数校验、数据导入、绘图和结果管理。当前 MCP 代码版本为 `v0.1.5`；已发布的 Docker 镜像为 `ghcr.io/keyingshuzhi-2025/keying-research-draw-mcp:v0.1.5`。本机 stdio、本机 Docker 和阿里云 ECS（Alibaba Cloud Linux 3）部署教程（内部资料，本地位于 `.internal-docs/MCP_DEPLOYMENT_GUIDE.md`）随内部资料包下发，不随公开仓库分发。工作区由服务端配置为逻辑名称，工具调用可省略工作区参数使用默认值，也可传逻辑名称：
 
 ```bash
 uv sync --extra mcp
@@ -129,7 +129,7 @@ uv run --extra mcp research-draw-mcp
 
 复杂、耗时的直接绘图请使用 `start_render_job`（`mode`、`plot`、`config` 均为必填顶层参数）；文件绘图、批量绘图或复杂图重绘使用 `start_plot_job`。工具会先返回任务 ID，再轮询 `get_plot_job_status`，完成后调用 `get_plot_job_result` 获取结果和图像内容。客户端或网络超时后，用相同的 `request_id` 和参数重试提交即可复用原任务，避免重复绘制。
 
-详细配置和调用示例见 [MCP_SERVER_README.md](MCP_SERVER_README.md)。
+详细配置和调用示例见内部资料 `.internal-docs/MCP_SERVER_README.md`（不随公开仓库分发）。
 
 ## Web 快速开始
 
@@ -224,9 +224,12 @@ Web 端运行时配额/清理策略可通过环境变量配置：
 
 ## 文档
 
-- CLI/Web 详细手册：`ResearchDrawApp_使用手册.md`
-- Web 模块说明：`web/README.md`
-- 脚本层说明：`scripts/README.md`
+- CLI/Web 详细手册：[ResearchDrawApp_使用手册.md](ResearchDrawApp_使用手册.md)
+- Web 模块说明：[web/README.md](web/README.md)
+- 脚本层说明：[scripts/README.md](scripts/README.md)
+- 项目留档、MCP 实现说明与部署教程：内部设计资料，存放于本地隐藏目录 `.internal-docs/`，不进入公开仓库
+
+> 内部设计资料目录 `.internal-docs/` 已在 `.gitignore` 中忽略。克隆仓库后如需查阅这些文档，请向项目负责人获取。
 
 ## 项目结构
 
