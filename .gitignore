@@ -168,3 +168,8 @@ cython_debug/
 web/frontend/node_modules/
 web/frontend/dist/
 outputs/web/
+
+# 内部设计资料（不进入公开仓库；本地保留）
+# 包含：项目留档、MCP 实现总结/工具说明/部署教程
+# 注意：ResearchDrawApp_使用手册.md 属于公开产品文档，不在本目录
+.internal-docs/
