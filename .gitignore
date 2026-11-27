@@ -126,6 +126,8 @@ celerybeat.pid
 .env
 .venv
 .dsh/
+# 柯影智航运行时目录（含 GitHub CLI 凭据 .koying/config/gh/hosts.yml，禁止提交）
+.koying/
 .DS_Store
 env/
 venv/
